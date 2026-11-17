@@ -1,5 +1,5 @@
 <?php
-$_['heading_title'] = 'Nova Poshta 1.6.0';
+$_['heading_title'] = 'Nova Poshta 1.6.1';
 $_['text_home'] = 'Home';
 $_['text_extension'] = 'Extensions';
 $_['text_success'] = 'Nova Poshta settings saved';
@@ -193,7 +193,9 @@ $_['help_pane_sync'] = "Areas, cities and branches stored in the shop.\nAn empty
 $_['help_pane_track'] = "The cron key protects the links below. An empty key disables cron.\nThe customer email is the normal OpenCart email when the order status changes from the table. No disables that email. The shop status changes only when a status is selected, not Skip.\nManager email is sent when a parcel arrives, is refused, or COD money is sent. Empty uses the shop email.\nCall the links from the server: tracking hourly, directory at night.";
 $_['help_pane_log'] = "Latest API replies: time, method and result.\nAn error here means Nova Poshta rejected the key or the request.";
 $_['help_pane_versions'] = "Current version and earlier changes. The same number is in novaposhta-X.Y.Z.ocmod.zip.";
+$_['text_address_empty'] = 'Nova Poshta returned no addresses for this counterparty';
 $_['changelog'] = array(
+	'1.6.1' => 'Sender address from the Nova Poshta cabinet: city and branch, not a placeholder.',
 	'1.6.0' => 'Look tab removed. City and branch suggestions go into checkout fields. Help in every section. Update button when the directory exists. Directory language. Contact shows a name, not an id.',
 	'1.5.1' => 'Cargo description: full token list with an example and a resizable field.',
 	'1.5.0' => 'City and warehouse on the order, cargo from products, TTN queue, stored registries, manager emails, tabs and status colors, checkout look and custom fields, TTN edit, cargo types, EDRPOU, customer warehouse change, warehouse hours and courier intervals. Version in the admin and in the file name.',

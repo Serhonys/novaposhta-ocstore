@@ -342,13 +342,17 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 			foreach ($addresses as $row) {
 				$addressOut[] = array(
 					'ref'      => isset($row['Ref']) ? $row['Ref'] : '',
-					'name'     => $this->partyName($row, false),
-					'city_ref' => isset($row['CityRef']) ? $row['CityRef'] : ''
+					'name'     => $this->addressName($row),
+					'city_ref' => !empty($row['CityRef']) ? $row['CityRef'] : (isset($row['City']) ? $row['City'] : '')
 				);
 			}
 		}
 
-		$this->json(array('contacts' => $contactOut, 'addresses' => $addressOut));
+		$this->json(array(
+			'contacts' => $contactOut,
+			'addresses' => $addressOut,
+			'address_empty' => $addressOut ? '' : $this->language->get('text_address_empty')
+		));
 	}
 
 	public function eventOrderInfo(&$route, &$data, &$output) {
@@ -585,6 +589,34 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 				)
 			)
 		);
+	}
+
+	private function addressName(array $row) {
+		$parts = array();
+		foreach (array('CityDescription', 'SettlementDescription', 'Description', 'AddressDescription', 'WarehouseDescription', 'StreetDescription') as $key) {
+			if (empty($row[$key])) {
+				continue;
+			}
+			$value = trim((string)$row[$key]);
+			if ($value === '' || preg_match('/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i', $value)) {
+				continue;
+			}
+			if (!in_array($value, $parts, true)) {
+				$parts[] = $value;
+			}
+		}
+		if (!$parts) {
+			return $this->language->get('text_unnamed');
+		}
+		$description = isset($row['Description']) ? trim((string)$row['Description']) : '';
+		if ($description !== '' && !preg_match('/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i', $description)) {
+			$city = isset($row['CityDescription']) ? trim((string)$row['CityDescription']) : '';
+			if ($city !== '' && mb_strpos($description, $city) === false) {
+				return $city . ', ' . $description;
+			}
+			return $description;
+		}
+		return implode(', ', $parts);
 	}
 
 	private function partyName(array $row, $withPhone) {

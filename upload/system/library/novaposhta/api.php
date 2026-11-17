@@ -175,10 +175,18 @@ class NovaposhtaApi {
 	}
 
 	public function addresses($counterpartyRef) {
-		return $this->call('Counterparty', 'getCounterpartyAddresses', array(
+		$properties = array(
 			'Ref'                  => $counterpartyRef,
 			'CounterpartyProperty' => 'Sender'
-		));
+		);
+		$data = $this->call('Counterparty', 'getCounterpartyAddresses', $properties);
+		if (!$data) {
+			$general = $this->call('CounterpartyGeneral', 'getCounterpartyAddresses', $properties);
+			if ($general) {
+				return $general;
+			}
+		}
+		return $data;
 	}
 
 	public function price(array $properties) {

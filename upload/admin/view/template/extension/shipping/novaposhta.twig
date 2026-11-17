@@ -543,6 +543,9 @@
       $.each(json.addresses || [], function (_, row) {
         addresses.append($('<option>').val(row.ref).text(row.name).attr('data-city', row.city_ref || '').attr('data-real', '1'));
       });
+      if (!addresses.children().length) {
+        addresses.append($('<option>').val('').text(json.address_empty || ''));
+      }
       contacts.trigger('change');
       addresses.trigger('change');
       rememberNames();
