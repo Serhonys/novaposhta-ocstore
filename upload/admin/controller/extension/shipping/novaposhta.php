@@ -355,6 +355,29 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 		));
 	}
 
+	public function cities() {
+		$this->load->language('extension/shipping/novaposhta');
+		if (!$this->user->hasPermission('access', 'extension/shipping/novaposhta')) {
+			$this->json(array());
+			return;
+		}
+		$service = new NovaposhtaService($this->registry);
+		$query = isset($this->request->get['q']) ? $this->request->get['q'] : '';
+		$this->json($service->searchCities($query, strpos((string)$this->language->get('code'), 'ru') === 0));
+	}
+
+	public function warehouses() {
+		$this->load->language('extension/shipping/novaposhta');
+		if (!$this->user->hasPermission('access', 'extension/shipping/novaposhta')) {
+			$this->json(array());
+			return;
+		}
+		$service = new NovaposhtaService($this->registry);
+		$city = isset($this->request->get['city_ref']) ? $this->request->get['city_ref'] : '';
+		$query = isset($this->request->get['q']) ? $this->request->get['q'] : '';
+		$this->json($service->searchWarehouses($city, $query, false, 0, 0, 0, 0, strpos((string)$this->language->get('code'), 'ru') === 0));
+	}
+
 	public function eventOrderInfo(&$route, &$data, &$output) {
 		if (empty($this->request->get['order_id'])) {
 			return;

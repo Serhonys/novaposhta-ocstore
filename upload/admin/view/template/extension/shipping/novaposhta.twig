@@ -264,13 +264,19 @@
                 <option value="Doors" {% if shipping_novaposhta_sender_type == 'Doors' %}selected{% endif %}>{{ text_from_doors }}</option>
               </select>
             </label>
-            <label>{{ entry_sender_address }}
-              <select name="shipping_novaposhta_sender_address" id="input-address">
-                <option value="{{ shipping_novaposhta_sender_address }}">{% if shipping_novaposhta_sender_address_name %}{{ shipping_novaposhta_sender_address_name }}{% else %}{{ text_name_after_check }}{% endif %}</option>
-              </select>
-              <input type="hidden" name="shipping_novaposhta_sender_address_name" id="input-address-name" value="{{ shipping_novaposhta_sender_address_name }}" />
-              <input type="hidden" name="shipping_novaposhta_sender_city" id="input-sender-city" value="{{ shipping_novaposhta_sender_city }}" />
-            </label>
+            <div class="np-grid">
+              <label>{{ entry_sender_city_pick }}
+                <input type="text" id="np-sender-city-q" class="np-field" autocomplete="off" placeholder="{{ text_sender_city_ph }}" />
+              </label>
+              <label>{{ entry_sender_address }}
+                <input type="text" id="np-sender-wh-q" class="np-field" value="{{ shipping_novaposhta_sender_address_name }}" autocomplete="off" placeholder="{{ text_sender_wh_ph }}" />
+              </label>
+            </div>
+            <p class="np-note">{{ help_sender_pick }}</p>
+            <select id="input-address-api" hidden></select>
+            <input type="hidden" name="shipping_novaposhta_sender_address" id="input-address-ref" value="{{ shipping_novaposhta_sender_address }}" />
+            <input type="hidden" name="shipping_novaposhta_sender_address_name" id="input-address-name" value="{{ shipping_novaposhta_sender_address_name }}" />
+            <input type="hidden" name="shipping_novaposhta_sender_city" id="input-sender-city" value="{{ shipping_novaposhta_sender_city }}" />
             <h3>{{ text_more_senders }}</h3>
             <p class="np-note">{{ help_senders }}</p>
             {% for i in 0..2 %}
@@ -413,6 +419,9 @@
 .np-help-card h3 { margin:0 36px 12px 0; }
 .np-help-card #np-help-text { white-space:pre-line; line-height:1.5; }
 .np-help-x { position:absolute; top:12px; right:12px; width:32px; height:32px; border:0; border-radius:999px; background:#f6f3ee; font-size:20px; }
+.np-admin .np-field { position:relative; }
+.np-admin .np-suggest { position:absolute; z-index:30; left:0; right:0; top:100%; background:#fff; border:1px solid var(--line); border-radius:10px; max-height:220px; overflow:auto; box-shadow:0 8px 24px rgba(0,0,0,.08); }
+.np-admin .np-suggest button { display:block; width:100%; text-align:left; border:0; background:#fff; padding:8px 10px; border-bottom:1px solid #f3f0ea; }
 .np-admin label { display:block; margin:0 0 14px; color:var(--muted); font-size:13px; font-weight:600; }
 .np-admin input, .np-admin select { display:block; width:100%; margin-top:6px; height:40px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); padding:0 12px; box-shadow:none; }
 .np-admin textarea.np-grow { display:block; width:100%; min-height:88px; margin-top:6px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); padding:10px 12px; resize:vertical; line-height:1.45; field-sizing:content; }
@@ -525,11 +534,62 @@
   function rememberNames() {
     var sender = chosenName($('#input-sender'));
     var contact = chosenName($('#input-contact'));
-    var address = chosenName($('#input-address'));
     if (sender) $('#input-sender-name').val(sender);
     if (contact) $('#input-contact-name').val(contact);
-    if (address) $('#input-address-name').val(address);
   }
+  function suggest($input, rows, onPick) {
+    $input.siblings('.np-suggest').remove();
+    if (!rows || !rows.length) return;
+    $input.parent().css('position', 'relative');
+    var $list = $('<div class="np-suggest"></div>');
+    $.each(rows, function (_, row) {
+      var label = row.area ? (row.name + ', ' + row.area) : row.name;
+      var $item = $('<button type="button"></button>').text(label);
+      $item.on('mousedown', function (e) {
+        e.preventDefault();
+        onPick(row);
+        $list.remove();
+      });
+      $list.append($item);
+    });
+    $input.after($list);
+  }
+  var cityTimer;
+  var whTimer;
+  $('#np-sender-city-q').on('input', function () {
+    var q = $.trim(this.value);
+    clearTimeout(cityTimer);
+    if (q.length < 2) return;
+    cityTimer = setTimeout(function () {
+      $.getJSON('index.php?route=extension/shipping/novaposhta/cities&user_token=' + token + '&q=' + encodeURIComponent(q), function (rows) {
+        suggest($('#np-sender-city-q'), rows || [], function (row) {
+          $('#np-sender-city-q').val(row.name).data('ref', row.ref);
+          $('#input-sender-city').val(row.ref);
+          $('#np-sender-wh-q').val('').focus();
+          $('#input-address-ref').val('');
+          $('#input-address-name').val('');
+        });
+      });
+    }, 200);
+  });
+  $('#np-sender-wh-q').on('input', function () {
+    var q = $.trim(this.value);
+    var city = $('#np-sender-city-q').data('ref') || $('#input-sender-city').val();
+    clearTimeout(whTimer);
+    if (!city || q.length < 1) return;
+    whTimer = setTimeout(function () {
+      $.getJSON('index.php?route=extension/shipping/novaposhta/warehouses&user_token=' + token + '&city_ref=' + encodeURIComponent(city) + '&q=' + encodeURIComponent(q), function (rows) {
+        suggest($('#np-sender-wh-q'), rows || [], function (row) {
+          var cityName = $.trim($('#np-sender-city-q').val());
+          var label = cityName ? (cityName + ', ' + row.name) : row.name;
+          $('#np-sender-wh-q').val(label);
+          $('#input-address-ref').val(row.ref);
+          $('#input-address-name').val(label);
+          $('#input-sender-city').val(city);
+        });
+      });
+    }, 200);
+  });
   $('#input-sender').on('change', function () {
     var ref = $(this).val();
     if (!ref) return;
@@ -539,12 +599,17 @@
       $.each(json.contacts || [], function (_, row) {
         contacts.append($('<option>').val(row.ref).text(row.name).attr('data-phone', row.phone || '').attr('data-real', '1'));
       });
-      var addresses = $('#input-address').empty();
+      var addresses = $('#input-address-api').empty().prop('hidden', true);
       $.each(json.addresses || [], function (_, row) {
         addresses.append($('<option>').val(row.ref).text(row.name).attr('data-city', row.city_ref || '').attr('data-real', '1'));
       });
-      if (!addresses.children().length) {
-        addresses.append($('<option>').val('').text(json.address_empty || ''));
+      if (addresses.children().length) {
+        addresses.prop('hidden', false);
+        var first = addresses.find('option').first();
+        $('#input-address-ref').val(first.val());
+        $('#input-address-name').val(first.text());
+        $('#np-sender-wh-q').val(first.text());
+        if (first.attr('data-city')) $('#input-sender-city').val(first.attr('data-city'));
       }
       contacts.trigger('change');
       addresses.trigger('change');
@@ -552,7 +617,7 @@
     });
   });
 
-  $('#input-contact, #input-address').on('change', function () {
+  $('#input-contact').on('change', function () {
     rememberNames();
   });
 
@@ -561,9 +626,13 @@
     if (phone) $('#input-phone').val(phone);
   });
 
-  $('#input-address').on('change', function () {
-    var city = $(this).find(':selected').attr('data-city');
-    if (city) $('#input-sender-city').val(city);
+  $('#input-address-api').on('change', function () {
+    var $option = $(this).find(':selected');
+    if ($option.attr('data-real') !== '1') return;
+    $('#input-address-ref').val($option.val());
+    $('#input-address-name').val($option.text());
+    $('#np-sender-wh-q').val($option.text());
+    if ($option.attr('data-city')) $('#input-sender-city').val($option.attr('data-city'));
   });
 
   $('#button-sync').on('click', function () {

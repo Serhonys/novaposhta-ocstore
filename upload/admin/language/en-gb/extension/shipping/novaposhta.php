@@ -1,5 +1,5 @@
 <?php
-$_['heading_title'] = 'Nova Poshta 1.6.1';
+$_['heading_title'] = 'Nova Poshta 1.6.2';
 $_['text_home'] = 'Home';
 $_['text_extension'] = 'Extensions';
 $_['text_success'] = 'Nova Poshta settings saved';
@@ -194,7 +194,12 @@ $_['help_pane_track'] = "The cron key protects the links below. An empty key dis
 $_['help_pane_log'] = "Latest API replies: time, method and result.\nAn error here means Nova Poshta rejected the key or the request.";
 $_['help_pane_versions'] = "Current version and earlier changes. The same number is in novaposhta-X.Y.Z.ocmod.zip.";
 $_['text_address_empty'] = 'Nova Poshta returned no addresses for this counterparty';
+$_['entry_sender_city_pick'] = 'Sender city';
+$_['text_sender_city_ph'] = 'Kremenchuk';
+$_['text_sender_wh_ph'] = '3 or Svobody';
+$_['help_sender_pick'] = 'The Nova Poshta cabinet often does not return its saved addresses. Type the city, then the branch number or street. The list comes from the downloaded directory.';
 $_['changelog'] = array(
+	'1.6.2' => 'Sender branch is picked from the directory: city, then branch.',
 	'1.6.1' => 'Sender address from the Nova Poshta cabinet: city and branch, not a placeholder.',
 	'1.6.0' => 'Look tab removed. City and branch suggestions go into checkout fields. Help in every section. Update button when the directory exists. Directory language. Contact shows a name, not an id.',
 	'1.5.1' => 'Cargo description: full token list with an example and a resizable field.',
