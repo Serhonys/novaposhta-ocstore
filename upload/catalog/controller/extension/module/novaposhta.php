@@ -24,52 +24,21 @@ class ControllerExtensionModuleNovaposhta extends Controller {
 		$service->hydrateSelection($this->session->data, $customerId, $cookie);
 		$saved = isset($this->session->data['novaposhta']) ? $this->session->data['novaposhta'] : array();
 
-		$label = function ($key, $fallback) {
-			$value = trim((string)$this->config->get($key));
-			return $value !== '' ? $value : $fallback;
-		};
-		$color = (string)$this->config->get('shipping_novaposhta_color');
-		if (!preg_match('/^#[0-9a-fA-F]{3,8}$/', $color)) {
-			$color = '#1c1917';
-		}
-		$radius = (int)$this->config->get('shipping_novaposhta_radius');
-		if ($radius < 0 || $radius > 24) {
-			$radius = 8;
-		}
-
 		$config = array(
 			'countryId'    => (int)$this->config->get('shipping_novaposhta_country_id'),
 			'cityUrl'      => $this->url->link('extension/module/novaposhta/cities', '', true),
 			'warehouseUrl' => $this->url->link('extension/module/novaposhta/warehouses', '', true),
-			'nearestUrl'   => $this->url->link('extension/module/novaposhta/nearest', '', true),
-			'mapUrl'       => $this->url->link('extension/module/novaposhta/map', '', true),
-			'settlementUrl'=> $this->url->link('extension/module/novaposhta/settlements', '', true),
 			'streetUrl'    => $this->url->link('extension/module/novaposhta/streets', '', true),
-			'hoursUrl'     => $this->url->link('extension/module/novaposhta/hours', '', true),
+			'settlementUrl'=> $this->url->link('extension/module/novaposhta/settlements', '', true),
 			'saveUrl'      => $this->url->link('extension/module/novaposhta/save', '', true),
-			'textCity'     => $this->language->get('entry_city'),
-			'textPoint'    => $this->language->get('entry_point'),
-			'textStreet'   => $this->language->get('entry_street'),
-			'textBuilding' => $this->language->get('entry_building'),
-			'textFlat'     => $this->language->get('entry_flat'),
-			'textEmpty'    => $this->language->get('text_empty'),
-			'textBranch'   => $label('shipping_novaposhta_label_department', $this->language->get('text_method_department')),
-			'textLocker'   => $label('shipping_novaposhta_label_poshtomat', $this->language->get('text_method_poshtomat')),
-			'textCourier'  => $label('shipping_novaposhta_label_doors', $this->language->get('text_method_doors')),
-			'textNearest'  => $this->language->get('text_nearest'),
-			'textMap'      => $this->language->get('text_map'),
-			'textMapNeed'  => $this->language->get('text_map_need_city'),
-			'method'       => !empty($saved['method']) ? $saved['method'] : 'department',
-			'saved'        => $saved,
-			'fieldCity'    => (int)$this->config->get('shipping_novaposhta_field_city'),
-			'fieldPoint'   => (int)$this->config->get('shipping_novaposhta_field_warehouse'),
-			'fieldStreet'  => (int)$this->config->get('shipping_novaposhta_field_street'),
-			'fieldBuilding'=> (int)$this->config->get('shipping_novaposhta_field_building'),
-			'fieldFlat'    => (int)$this->config->get('shipping_novaposhta_field_flat'),
-			'compact'      => (int)$this->config->get('shipping_novaposhta_compact') ? 1 : 0
+			'city'         => (string)$this->config->get('shipping_novaposhta_checkout_city'),
+			'point'        => (string)$this->config->get('shipping_novaposhta_checkout_point'),
+			'street'       => (string)$this->config->get('shipping_novaposhta_checkout_street'),
+			'building'     => (string)$this->config->get('shipping_novaposhta_checkout_building'),
+			'flat'         => (string)$this->config->get('shipping_novaposhta_checkout_flat'),
+			'method'       => !empty($saved['method']) ? $saved['method'] : 'department'
 		);
 
-		$output .= '<style>.np-box{--np:' . $color . ';--np-radius:' . $radius . 'px}</style>';
 		$output .= '<script>window.NovaPoshtaConfig=' . json_encode($config, JSON_UNESCAPED_UNICODE) . ';</script>';
 	}
 
@@ -337,7 +306,14 @@ class ControllerExtensionModuleNovaposhta extends Controller {
 	}
 
 	private function isRussian() {
-		$code = $this->language->get('code');
+		$mode = (string)$this->config->get('shipping_novaposhta_lang');
+		if ($mode === 'ru') {
+			return true;
+		}
+		if ($mode === 'uk') {
+			return false;
+		}
+		$code = (string)$this->language->get('code');
 		return strpos($code, 'ru') === 0;
 	}
 

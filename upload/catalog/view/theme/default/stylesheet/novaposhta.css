@@ -16,10 +16,14 @@
 .np-box.np-compact .np-types button { padding: 4px 8px; font-size: 13px; }
 .np-hours { margin-top: 4px; color: #6f675e; font-size: 12px; }
 .np-list {
-  position: relative;
-  z-index: 20;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 30;
   background: #fff;
   border: 1px solid #ddd;
+  border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,.08);
   max-height: 240px;
   overflow: auto;

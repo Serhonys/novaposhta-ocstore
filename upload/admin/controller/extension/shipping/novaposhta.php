@@ -95,17 +95,15 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 			'shipping_novaposhta_sms_url',
 			'shipping_novaposhta_senders',
 			'shipping_novaposhta_alert_email',
-			'shipping_novaposhta_color',
-			'shipping_novaposhta_radius',
-			'shipping_novaposhta_label_department',
-			'shipping_novaposhta_label_poshtomat',
-			'shipping_novaposhta_label_doors',
-			'shipping_novaposhta_field_city',
-			'shipping_novaposhta_field_warehouse',
-			'shipping_novaposhta_field_street',
-			'shipping_novaposhta_field_building',
-			'shipping_novaposhta_field_flat',
-			'shipping_novaposhta_compact'
+			'shipping_novaposhta_lang',
+			'shipping_novaposhta_checkout_city',
+			'shipping_novaposhta_checkout_point',
+			'shipping_novaposhta_checkout_street',
+			'shipping_novaposhta_checkout_building',
+			'shipping_novaposhta_checkout_flat',
+			'shipping_novaposhta_sender_name',
+			'shipping_novaposhta_sender_contact_name',
+			'shipping_novaposhta_sender_address_name'
 		);
 
 		foreach ($fields as $field) {
@@ -184,40 +182,26 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 			);
 		}
 
+		if (!$data['shipping_novaposhta_lang']) {
+			$data['shipping_novaposhta_lang'] = 'auto';
+		}
+
 		$service = new NovaposhtaService($this->registry);
 		$data['counts'] = $service->counts();
 		$data['logs'] = $service->recentLogs();
-		$data['custom_fields'] = array();
-		$this->load->model('customer/custom_field');
-		$loaded = array();
-		try {
-			$loaded = $this->model_customer_custom_field->getCustomFields();
-		} catch (Throwable $e) {
-			$loaded = array();
-		}
-		$locMap = array(
-			'address'   => $this->language->get('text_loc_address'),
-			'account'   => $this->language->get('text_loc_account'),
-			'affiliate' => $this->language->get('text_loc_affiliate')
-		);
-		if (is_array($loaded)) {
-			foreach ($loaded as $field) {
-				if (empty($field['custom_field_id'])) {
-					continue;
-				}
-				$loc = isset($field['location']) ? $field['location'] : '';
-				$suffix = isset($locMap[$loc]) ? (' · ' . $locMap[$loc]) : '';
-				$data['custom_fields'][] = array(
-					'id'    => $field['custom_field_id'],
-					'name'  => $field['name'],
-					'label' => $field['name'] . $suffix
-				);
-			}
-		}
+		$data['directory_ready'] = ($data['counts']['regions'] + $data['counts']['cities'] + $data['counts']['warehouses'] + $data['counts']['lockers']) > 0;
 		$store = $this->config->get('config_secure') ? HTTPS_CATALOG : HTTP_CATALOG;
 		$data['cron_track'] = $store . 'index.php?route=extension/module/novaposhta/cron&task=track&key=' . $data['shipping_novaposhta_cron_key'];
 		$data['cron_queue'] = $store . 'index.php?route=extension/module/novaposhta/cron&task=queue&key=' . $data['shipping_novaposhta_cron_key'];
 		$data['cron_sync'] = $store . 'index.php?route=extension/module/novaposhta/cron&task=warehouses&page=1&key=' . $data['shipping_novaposhta_cron_key'];
+		$help = array();
+		foreach (array('general', 'methods', 'tariff', 'sender', 'sync', 'track', 'log', 'versions') as $pane) {
+			$help[$pane] = array(
+				'title' => $this->language->get('tab_' . $pane),
+				'text'  => $this->language->get('help_pane_' . $pane)
+			);
+		}
+		$data['help_panes_json'] = json_encode($help, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
 		$data['header'] = $this->load->controller('common/header');
 		$data['column_left'] = $this->load->controller('common/column_left');
@@ -305,7 +289,7 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 			}
 			$out[] = array(
 				'ref'  => $row['Ref'],
-				'name' => isset($row['Description']) ? $row['Description'] : $row['Ref']
+				'name' => $this->partyName($row, false)
 			);
 		}
 
@@ -347,7 +331,7 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 				}
 				$contactOut[] = array(
 					'ref'   => isset($row['Ref']) ? $row['Ref'] : '',
-					'name'  => isset($row['Description']) ? $row['Description'] : '',
+					'name'  => $this->partyName($row, true),
 					'phone' => $phone
 				);
 			}
@@ -358,7 +342,7 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 			foreach ($addresses as $row) {
 				$addressOut[] = array(
 					'ref'      => isset($row['Ref']) ? $row['Ref'] : '',
-					'name'     => isset($row['Description']) ? $row['Description'] : '',
+					'name'     => $this->partyName($row, false),
 					'city_ref' => isset($row['CityRef']) ? $row['CityRef'] : ''
 				);
 			}
@@ -601,6 +585,35 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 				)
 			)
 		);
+	}
+
+	private function partyName(array $row, $withPhone) {
+		$parts = array();
+		foreach (array('LastName', 'FirstName', 'MiddleName') as $key) {
+			if (!empty($row[$key])) {
+				$parts[] = trim((string)$row[$key]);
+			}
+		}
+		$name = trim(implode(' ', $parts));
+		$desc = isset($row['Description']) ? trim((string)$row['Description']) : '';
+		if ($name === '' && $desc !== '' && !preg_match('/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i', $desc)) {
+			$name = $desc;
+		}
+		if ($withPhone && $name !== '') {
+			$phone = '';
+			if (!empty($row['Phones'])) {
+				$phone = $row['Phones'];
+			} elseif (!empty($row['Phone'])) {
+				$phone = $row['Phone'];
+			}
+			if ($phone !== '') {
+				$name .= ' · ' . $phone;
+			}
+		}
+		if ($name === '') {
+			$name = $this->language->get('text_unnamed');
+		}
+		return $name;
 	}
 
 	private function persistApiKey($key) {

@@ -6,8 +6,8 @@
   function debounce(fn, ms) {
     var t;
     return function () {
-      var args = arguments;
       var self = this;
+      var args = arguments;
       clearTimeout(t);
       t = setTimeout(function () { fn.apply(self, args); }, ms);
     };
@@ -17,12 +17,56 @@
     $('.np-list').remove();
   }
 
-  function list(input, rows, onPick) {
-    closeLists();
-    if (!rows.length) {
-      return;
+  function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ''));
+  }
+
+  function nodes(selector, fallback) {
+    var query = $.trim(selector || '') || fallback || '';
+    if (!query) return $();
+    var $found = $();
+    $.each(query.split(','), function (_, part) {
+      part = $.trim(part);
+      if (!part) return;
+      var $one;
+      var looksLikeSelector = /^(#|\.|input\b|select\b|textarea\b)/.test(part) || part.indexOf(' ') !== -1;
+      if (looksLikeSelector) {
+        $one = $(part);
+      } else {
+        var name = part.replace(/"/g, '\\"');
+        $one = $('input[name="' + name + '"], textarea[name="' + name + '"]');
+      }
+      $found = $found.add($one.filter('input, textarea')).add($one.find('input, textarea'));
+    });
+    return $found.filter(':visible').length ? $found.filter(':visible') : $found;
+  }
+
+  function method() {
+    var $checked = $('input[name="shipping_method"]:checked');
+    if ($checked.length && String($checked.val()).indexOf('novaposhta.') === 0) {
+      return String($checked.val()).split('.')[1];
     }
-    var $list = $('<div class="np-list"></div>');
+    var c = cfg();
+    return (c && c.method) || 'department';
+  }
+
+  function allowed($input) {
+    var c = cfg();
+    if (!c || !c.countryId) return true;
+    var $country = $input.closest('form').find('select[name="country_id"], select[name$="[country_id]"]');
+    if (!$country.length) return true;
+    var value = String($country.val() || '');
+    return !value || value === '0' || value === String(c.countryId);
+  }
+
+  function list($input, rows, onPick) {
+    closeLists();
+    if (!rows || !rows.length) return;
+    var $parent = $input.parent();
+    if ($parent.css('position') === 'static') {
+      $parent.css('position', 'relative');
+    }
+    var $box = $('<div class="np-list"></div>');
     $.each(rows, function (_, row) {
       var label = row.area ? (row.name + ', ' + row.area) : row.name;
       var $item = $('<button type="button" class="np-item"></button>').text(label);
@@ -31,348 +75,126 @@
         onPick(row);
         closeLists();
       });
-      $list.append($item);
+      $box.append($item);
     });
-    $(input).after($list);
+    $input.after($box);
   }
 
-  function ensureBox($city) {
-    if ($city.data('np-ready')) {
-      return;
-    }
+  function payload() {
     var c = cfg();
-    if (!c) {
-      return;
-    }
-    $city.data('np-ready', 1);
-    var $form = $city.closest('form');
-    if (!$form.find('.np-box').length) {
-      var html = ''
-        + '<div class="np-box' + (c.compact ? ' np-compact' : '') + '">'
-        + '<div class="np-types">'
-        + '<button type="button" data-method="department">' + c.textBranch + '</button>'
-        + '<button type="button" data-method="poshtomat">' + c.textLocker + '</button>'
-        + '<button type="button" data-method="doors">' + c.textCourier + '</button>'
-        + '</div>'
-        + '<div class="np-point"><input type="text" class="form-control np-point-input" autocomplete="off" placeholder="' + c.textPoint + '" /></div>'
-        + '<div class="np-door" style="display:none">'
-        + '<input type="text" class="form-control np-street" autocomplete="off" placeholder="' + c.textStreet + '" />'
-        + '<div class="np-door-row"><input type="text" class="form-control np-building" placeholder="' + c.textBuilding + '" /><input type="text" class="form-control np-flat" placeholder="' + c.textFlat + '" /></div>'
-        + '</div>'
-        + '<div class="np-tools"><button type="button" class="np-nearest">' + (c.textNearest || '') + '</button><button type="button" class="np-map">' + (c.textMap || '') + '</button></div>'
-        + '</div>';
-      $city.closest('.form-group').after('<div class="form-group"><div class="col-sm-12">' + html + '</div></div>');
-    }
-    setMethod($city, c.method || 'department');
-    restore($city);
-  }
-
-  function box($city) {
-    return $city.closest('form').find('.np-box').first();
-  }
-
-  function setMethod($city, method) {
-    var $box = box($city);
-    $box.find('.np-types button').removeClass('is-on');
-    $box.find('[data-method="' + method + '"]').addClass('is-on');
-    $box.data('method', method);
-    if (method === 'doors') {
-      $box.find('.np-point').hide();
-      $box.find('.np-door').show();
-    } else {
-      $box.find('.np-door').hide();
-      $box.find('.np-point').show();
-      $box.find('.np-point-input').attr('placeholder', method === 'poshtomat' ? cfg().textLocker : cfg().textPoint);
-    }
-  }
-
-  function payload($city) {
-    var $box = box($city);
+    var $city = nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]').first();
+    var $point = nodes(c.point, 'input[name="address_1"], input[name="shipping_address[address_1]"]').first();
+    var $street = nodes(c.street).first();
+    var $building = nodes(c.building).first();
+    var $flat = nodes(c.flat).first();
     return {
-      method: $box.data('method') || 'department',
-      city_ref: $city.data('ref') || '',
+      method: method(),
+      city_ref: $city.data('np-ref') || '',
       city_name: $city.val() || '',
-      division_ref: $box.data('division-ref') || '',
-      division_id: $box.data('division-id') || '',
-      division_name: $box.find('.np-point-input').val() || '',
-      settlement_ref: $city.data('settlement') || '',
-      delivery_city: $city.data('delivery') || '',
-      street_ref: $box.data('street-ref') || '',
-      street_name: $box.find('.np-street').val() || '',
-      building: $box.find('.np-building').val() || '',
-      flat: $box.find('.np-flat').val() || ''
+      division_ref: $point.data('np-ref') || '',
+      division_id: $point.data('np-id') || '',
+      division_name: $point.val() || '',
+      settlement_ref: $city.data('np-settlement') || '',
+      delivery_city: $city.data('np-delivery') || '',
+      street_ref: $street.data('np-ref') || '',
+      street_name: $street.val() || '',
+      building: $building.val() || '',
+      flat: $flat.val() || ''
     };
   }
 
-  function save($city) {
+  function save() {
     var c = cfg();
-    if (!c) return;
-    var data = payload($city);
-    document.cookie = 'np_pick=' + encodeURIComponent(JSON.stringify(data)) + ';path=/;max-age=31536000;SameSite=Lax';
-    fillCustom($city, data);
+    if (!c || !c.saveUrl) return;
     $.ajax({
       url: c.saveUrl,
       method: 'POST',
-      contentType: 'application/json',
-      data: JSON.stringify(data)
+      contentType: 'application/json; charset=UTF-8',
+      data: JSON.stringify(payload())
     });
   }
 
-  function restore($city) {
+  function bind($inputs, kind) {
     var c = cfg();
-    var saved = c && c.saved;
-    if (!saved || !saved.city_ref || $city.data('np-restored')) return;
-    $city.data('np-restored', 1);
-    if (!$city.val()) {
-      $city.val(saved.city_name || '');
-    }
-    $city.data('ref', saved.city_ref || '');
-    $city.data('settlement', saved.settlement_ref || '');
-    setMethod($city, saved.method || 'department');
-    var $box = box($city);
-    if (saved.division_name) {
-      $box.find('.np-point-input').val(saved.division_name);
-      $box.data('division-ref', saved.division_ref || '');
-      $box.data('division-id', saved.division_id || '');
-    }
-    if (saved.street_name) {
-      $box.find('.np-street').val(saved.street_name);
-      $box.data('street-ref', saved.street_ref || '');
-      $box.find('.np-building').val(saved.building || '');
-      $box.find('.np-flat').val(saved.flat || '');
-    }
-  }
-
-  function fillCustom($city, data) {
-    var c = cfg();
-    if (!c) return;
-    var map = {};
-    if (c.fieldCity) map[c.fieldCity] = data.city_name || '';
-    if (c.fieldPoint) map[c.fieldPoint] = data.division_name || '';
-    if (c.fieldStreet) map[c.fieldStreet] = data.street_name || '';
-    if (c.fieldBuilding) map[c.fieldBuilding] = data.building || '';
-    if (c.fieldFlat) map[c.fieldFlat] = data.flat || '';
-    var $form = $city.closest('form');
-    $.each(map, function (id, value) {
-      if (!id || !value) return;
-      var $input = $form.find('[name="custom_field[address][' + id + ']"], [name="custom_field[' + id + ']"]');
-      if ($input.length) {
-        $input.val(value).trigger('change');
-      }
-    });
-  }
-
-  function bindCity($city) {
-    ensureBox($city);
-    if ($city.data('np-bound')) return;
-    $city.data('np-bound', 1);
-    $city.attr('autocomplete', 'off');
-
-    $city.on('input', debounce(function () {
-      var c = cfg();
-      var q = $.trim($city.val());
-      $city.data('ref', '');
-      if (!c || q.length < 2) {
-        closeLists();
-        return;
-      }
-      var method = box($city).data('method');
-      var url = method === 'doors' ? c.settlementUrl : c.cityUrl;
-      $.getJSON(url, { q: q }, function (rows) {
-        list($city, rows || [], function (row) {
-          if (method === 'doors') {
-            $city.val(row.main || row.name);
-            $city.data('settlement', row.ref);
-            $city.data('delivery', row.delivery_city);
-            $city.data('ref', row.delivery_city);
-          } else {
-            $city.val(row.name);
-            $city.data('ref', row.ref);
-          }
-          save($city);
-        });
-      });
-    }, 250));
-  }
-
-  function bindPoint($city) {
-    var $input = box($city).find('.np-point-input');
-    if ($input.data('np-bound')) return;
-    $input.data('np-bound', 1);
-    $input.on('input', debounce(function () {
-      var c = cfg();
-      var ref = $city.data('ref');
-      if (!c || !ref) return;
-      var locker = box($city).data('method') === 'poshtomat' ? 1 : 0;
-      $.getJSON(c.warehouseUrl, { city_ref: ref, q: $input.val(), locker: locker }, function (rows) {
-        list($input, rows || [], function (row) {
-          $input.val(row.name);
-          var $address = $city.closest('form').find('input[name="address_1"]');
-          if ($address.length) {
-            $address.val(row.name);
-          }
-          box($city).data('division-ref', row.ref);
-          box($city).data('division-id', row.division_id || '');
-          if (c.hoursUrl && row.ref) {
-            $.getJSON(c.hoursUrl, { ref: row.ref }, function (json) {
-              box($city).find('.np-hours').remove();
-              if (json && json.hours) {
-                $input.after('<div class="np-hours">' + json.hours + '</div>');
+    $inputs.each(function () {
+      var $input = $(this);
+      if ($input.data('np-bound') || !allowed($input)) return;
+      $input.data('np-bound', 1);
+      $input.on('input', debounce(function () {
+        if (isUuid($input.data('np-ref')) && $input.data('np-label') !== $input.val()) {
+          $input.removeData('np-ref');
+        }
+        var q = $.trim($input.val());
+        if (q.length < 2) {
+          closeLists();
+          save();
+          return;
+        }
+        if (kind === 'city') {
+          $.getJSON(c.cityUrl, { q: q }, function (rows) {
+            list($input, rows || [], function (row) {
+              $input.val(row.name).data('np-ref', row.ref || '').data('np-label', row.name);
+              if (c.settlementUrl) {
+                $.getJSON(c.settlementUrl, { q: row.name }, function (places) {
+                  if (places && places[0]) {
+                    $input.data('np-settlement', places[0].ref || '');
+                    if (places[0].delivery_city) $input.data('np-delivery', places[0].delivery_city);
+                    save();
+                  }
+                });
               }
+              save();
             });
-          }
-          save($city);
-        });
-      });
-    }, 250));
-  }
-
-  function bindStreet($city) {
-    var $input = box($city).find('.np-street');
-    if ($input.data('np-bound')) return;
-    $input.data('np-bound', 1);
-    $input.on('input', debounce(function () {
-      var c = cfg();
-      var settlement = $city.data('settlement');
-      if (!c || !settlement) return;
-      $.getJSON(c.streetUrl, { settlement_ref: settlement, q: $input.val() }, function (rows) {
-        list($input, rows || [], function (row) {
-          $input.val(row.name);
-          box($city).data('street-ref', row.ref);
-          var $address = $city.closest('form').find('input[name="address_1"]');
-          if ($address.length) {
-            $address.val(row.name);
-          }
-          save($city);
-        });
-      });
-    }, 250));
-    box($city).find('.np-building, .np-flat').on('change', function () {
-      save($city);
+          });
+          return;
+        }
+        if (kind === 'point') {
+          var cityRef = nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]').first().data('np-ref') || '';
+          var locker = method() === 'poshtomat' ? 1 : 0;
+          $.getJSON(c.warehouseUrl, { city_ref: cityRef, q: q, locker: locker }, function (rows) {
+            list($input, rows || [], function (row) {
+              $input.val(row.name).data('np-ref', row.ref || '').data('np-id', row.division_id || '').data('np-label', row.name);
+              save();
+            });
+          });
+          return;
+        }
+        if (kind === 'street') {
+          var settlement = nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]').first().data('np-settlement') || '';
+          if (!settlement) return;
+          $.getJSON(c.streetUrl, { settlement_ref: settlement, q: q }, function (rows) {
+            list($input, rows || [], function (row) {
+              $input.val(row.name).data('np-ref', row.ref || '').data('np-label', row.name);
+              save();
+            });
+          });
+        }
+      }, 250));
+      $input.on('change', save);
     });
   }
 
   function scan() {
     var c = cfg();
     if (!c) return;
-    $('input[name="city"]').each(function () {
-      var $city = $(this);
-      var country = $city.closest('form').find('select[name="country_id"]').val();
-      if (c.countryId && country && String(country) !== String(c.countryId)) {
-        return;
-      }
-      bindCity($city);
-      bindPoint($city);
-      bindStreet($city);
-    });
+    bind(nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]'), 'city');
+    bind(nodes(c.point, 'input[name="address_1"], input[name="shipping_address[address_1]"]'), 'point');
+    bind(nodes(c.street), 'street');
+    bind(nodes(c.building), 'text');
+    bind(nodes(c.flat), 'text');
   }
-
-  $(document).on('click', '.np-nearest', function () {
-    var c = cfg();
-    var $city = $(this).closest('form').find('input[name="city"]').first();
-    if (!c || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(function (pos) {
-      var locker = box($city).data('method') === 'poshtomat' ? 1 : 0;
-      $.getJSON(c.nearestUrl, {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        city_ref: $city.data('ref') || '',
-        locker: locker
-      }, function (rows) {
-        if (!rows || !rows.length) return;
-        var row = rows[0];
-        if (row.city_name) {
-          $city.val(row.city_name);
-          $city.data('ref', row.city_ref);
-        }
-        var $input = box($city).find('.np-point-input');
-        $input.val(row.name);
-        box($city).data('division-ref', row.ref);
-        box($city).data('division-id', row.division_id || '');
-        var $address = $city.closest('form').find('input[name="address_1"]');
-        if ($address.length) $address.val(row.name);
-        save($city);
-      });
-    });
-  });
-
-  function loadLeaflet(done) {
-    if (window.L) {
-      done();
-      return;
-    }
-    if (!document.getElementById('np-leaflet-css')) {
-      var css = document.createElement('link');
-      css.id = 'np-leaflet-css';
-      css.rel = 'stylesheet';
-      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(css);
-    }
-    var script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = done;
-    document.head.appendChild(script);
-  }
-
-  $(document).on('click', '.np-map', function () {
-    var c = cfg();
-    var $city = $(this).closest('form').find('input[name="city"]').first();
-    var ref = $city.data('ref');
-    if (!c || !ref) {
-      window.alert(c && c.textMapNeed ? c.textMapNeed : 'City');
-      return;
-    }
-    var locker = box($city).data('method') === 'poshtomat' ? 1 : 0;
-    $.getJSON(c.mapUrl, { city_ref: ref, locker: locker }, function (rows) {
-      if (!rows || !rows.length) return;
-      var $overlay = $('<div class="np-overlay"><div class="np-map-box"><button type="button" class="np-map-close">×</button><div class="np-map-canvas"></div></div></div>');
-      $('body').append($overlay);
-      $overlay.find('.np-map-close').on('click', function () { $overlay.remove(); });
-      loadLeaflet(function () {
-        var map = L.map($overlay.find('.np-map-canvas')[0]).setView([rows[0].lat, rows[0].lng], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
-        $.each(rows, function (_, row) {
-          L.marker([row.lat, row.lng]).addTo(map).on('click', function () {
-            var $input = box($city).find('.np-point-input');
-            $input.val(row.name);
-            box($city).data('division-ref', row.ref);
-            box($city).data('division-id', row.division_id || '');
-            var $address = $city.closest('form').find('input[name="address_1"]');
-            if ($address.length) $address.val(row.name);
-            save($city);
-            $overlay.remove();
-          });
-        });
-        setTimeout(function () { map.invalidateSize(); }, 100);
-      });
-    });
-  });
-
-  $(document).on('click', '.np-types button', function () {
-    var $city = $(this).closest('form').find('input[name="city"]').first();
-    setMethod($city, $(this).data('method'));
-    save($city);
-  });
 
   $(document).on('click', function (e) {
-    if (!$(e.target).closest('.np-box, input[name="city"]').length) {
+    if (!$(e.target).closest('.np-list, input, textarea').length) {
       closeLists();
     }
   });
 
-  $(document).ajaxComplete(function (e, xhr, settings) {
+  $(document).on('ajaxComplete', function (e, xhr, settings) {
     if (!settings || !settings.url) return;
-    if (settings.url.indexOf('checkout/shipping_method') !== -1) {
-      var c = cfg();
-      var method = (cfg() && $('.np-box').data('method')) || (c && c.method);
-      if (method) {
-        var $radio = $('input[name="shipping_method"][value="novaposhta.' + method + '"]');
-        if ($radio.length && !$radio.prop('checked')) {
-          $radio.prop('checked', true).trigger('change');
-        }
-      }
+    if (settings.url.indexOf('checkout') !== -1 || settings.url.indexOf('simplecheckout') !== -1) {
+      scan();
     }
-    scan();
   });
 
   $(scan);

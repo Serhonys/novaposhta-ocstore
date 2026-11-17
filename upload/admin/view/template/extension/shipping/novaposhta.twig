@@ -36,11 +36,11 @@
           <button type="button" data-pane="sync">{{ tab_sync }}</button>
           <button type="button" data-pane="track">{{ tab_track }}</button>
           <button type="button" data-pane="log">{{ tab_log }}</button>
-          <button type="button" data-pane="look">{{ tab_look }}</button>
           <button type="button" data-pane="versions">{{ tab_versions }}</button>
         </nav>
         <div class="np-main">
           <section class="np-pane is-on" id="np-general">
+            <button type="button" class="np-help" data-help="general" title="{{ button_help }}">?</button>
             <div class="np-grid">
               <label>{{ entry_status }}
                 <select name="shipping_novaposhta_status">
@@ -114,9 +114,36 @@
               <input type="text" name="shipping_novaposhta_sms_url" value="{{ shipping_novaposhta_sms_url }}" />
               <small>{{ help_sms }}</small>
             </label>
+            <h3>{{ entry_checkout }}</h3>
+            <p class="np-note">{{ help_checkout }}</p>
+            <div class="np-grid">
+              <label>{{ entry_checkout_city }}
+                <input type="text" name="shipping_novaposhta_checkout_city" value="{{ shipping_novaposhta_checkout_city }}" placeholder="shipping_address[city]" />
+              </label>
+              <label>{{ entry_checkout_point }}
+                <input type="text" name="shipping_novaposhta_checkout_point" value="{{ shipping_novaposhta_checkout_point }}" placeholder="shipping_address[address_1]" />
+              </label>
+              <label>{{ entry_checkout_street }}
+                <input type="text" name="shipping_novaposhta_checkout_street" value="{{ shipping_novaposhta_checkout_street }}" />
+              </label>
+              <label>{{ entry_checkout_building }}
+                <input type="text" name="shipping_novaposhta_checkout_building" value="{{ shipping_novaposhta_checkout_building }}" />
+              </label>
+              <label>{{ entry_checkout_flat }}
+                <input type="text" name="shipping_novaposhta_checkout_flat" value="{{ shipping_novaposhta_checkout_flat }}" />
+              </label>
+              <label>{{ entry_lang }}
+                <select name="shipping_novaposhta_lang">
+                  <option value="auto" {% if shipping_novaposhta_lang != 'uk' and shipping_novaposhta_lang != 'ru' %}selected{% endif %}>{{ text_lang_auto }}</option>
+                  <option value="uk" {% if shipping_novaposhta_lang == 'uk' %}selected{% endif %}>{{ text_lang_uk }}</option>
+                  <option value="ru" {% if shipping_novaposhta_lang == 'ru' %}selected{% endif %}>{{ text_lang_ru }}</option>
+                </select>
+              </label>
+            </div>
           </section>
 
           <section class="np-pane" id="np-methods">
+            <button type="button" class="np-help" data-help="methods" title="{{ button_help }}">?</button>
             {% for code in ['department', 'poshtomat', 'doors'] %}
             {% set method = shipping_novaposhta_method[code]|default({}) %}
             <article class="np-card">
@@ -174,6 +201,7 @@
           </section>
 
           <section class="np-pane" id="np-tariff">
+            <button type="button" class="np-help" data-help="tariff" title="{{ button_help }}">?</button>
             <p class="np-note">{{ help_tariff }}</p>
             <div class="np-table-wrap">
               <table id="tariff-table">
@@ -211,17 +239,20 @@
           </section>
 
           <section class="np-pane" id="np-sender">
+            <button type="button" class="np-help" data-help="sender" title="{{ button_help }}">?</button>
             <label>{{ entry_sender }}
               <select name="shipping_novaposhta_sender_ref" id="input-sender">
-                <option value="{{ shipping_novaposhta_sender_ref }}">{{ shipping_novaposhta_sender_ref }}</option>
+                <option value="{{ shipping_novaposhta_sender_ref }}">{% if shipping_novaposhta_sender_name %}{{ shipping_novaposhta_sender_name }}{% else %}{{ text_name_after_check }}{% endif %}</option>
               </select>
+              <input type="hidden" name="shipping_novaposhta_sender_name" id="input-sender-name" value="{{ shipping_novaposhta_sender_name }}" />
               <small>{{ help_sender }}</small>
             </label>
             <div class="np-grid">
               <label>{{ entry_contact }}
                 <select name="shipping_novaposhta_sender_contact" id="input-contact">
-                  <option value="{{ shipping_novaposhta_sender_contact }}">{{ shipping_novaposhta_sender_contact }}</option>
+                  <option value="{{ shipping_novaposhta_sender_contact }}">{% if shipping_novaposhta_sender_contact_name %}{{ shipping_novaposhta_sender_contact_name }}{% else %}{{ text_name_after_check }}{% endif %}</option>
                 </select>
+                <input type="hidden" name="shipping_novaposhta_sender_contact_name" id="input-contact-name" value="{{ shipping_novaposhta_sender_contact_name }}" />
               </label>
               <label>{{ entry_phone }}
                 <input type="text" name="shipping_novaposhta_sender_phone" id="input-phone" value="{{ shipping_novaposhta_sender_phone }}" />
@@ -235,8 +266,9 @@
             </label>
             <label>{{ entry_sender_address }}
               <select name="shipping_novaposhta_sender_address" id="input-address">
-                <option value="{{ shipping_novaposhta_sender_address }}">{{ shipping_novaposhta_sender_address }}</option>
+                <option value="{{ shipping_novaposhta_sender_address }}">{% if shipping_novaposhta_sender_address_name %}{{ shipping_novaposhta_sender_address_name }}{% else %}{{ text_name_after_check }}{% endif %}</option>
               </select>
+              <input type="hidden" name="shipping_novaposhta_sender_address_name" id="input-address-name" value="{{ shipping_novaposhta_sender_address_name }}" />
               <input type="hidden" name="shipping_novaposhta_sender_city" id="input-sender-city" value="{{ shipping_novaposhta_sender_city }}" />
             </label>
             <h3>{{ text_more_senders }}</h3>
@@ -251,7 +283,10 @@
               </div>
               <div class="np-grid">
                 <label>Ref<input type="text" name="shipping_novaposhta_senders[{{ i }}][ref]" value="{{ sender.ref|default('') }}" /></label>
-                <label>{{ entry_contact }}<input type="text" name="shipping_novaposhta_senders[{{ i }}][contact]" value="{{ sender.contact|default('') }}" /></label>
+                <label>{{ entry_contact }}
+                  <input type="hidden" name="shipping_novaposhta_senders[{{ i }}][contact]" value="{{ sender.contact|default('') }}" />
+                  <input type="text" name="shipping_novaposhta_senders[{{ i }}][contact_name]" value="{{ sender.contact_name|default('') }}" placeholder="{{ text_name_after_check }}" readonly />
+                </label>
               </div>
               <div class="np-grid">
                 <label>{{ entry_phone }}<input type="text" name="shipping_novaposhta_senders[{{ i }}][phone]" value="{{ sender.phone|default('') }}" /></label>
@@ -270,18 +305,20 @@
           </section>
 
           <section class="np-pane" id="np-sync">
+            <button type="button" class="np-help" data-help="sync" title="{{ button_help }}">?</button>
             <div class="np-stats">
               <div><b id="np-stat-regions">{{ counts.regions }}</b><span>{{ text_regions }}</span></div>
               <div><b id="np-stat-cities">{{ counts.cities }}</b><span>{{ text_cities }}</span></div>
               <div><b id="np-stat-branches">{{ counts.warehouses }}</b><span>{{ text_branches }}</span></div>
               <div><b id="np-stat-lockers">{{ counts.lockers }}</b><span>{{ text_lockers }}</span></div>
             </div>
-            <button type="button" id="button-sync">{{ button_sync }}</button>
+            <button type="button" id="button-sync" data-label-update="{{ button_sync_update }}">{% if directory_ready %}{{ button_sync_update }}{% else %}{{ button_sync }}{% endif %}</button>
             <p class="np-note">{{ help_sync }}</p>
             <pre id="sync-log"></pre>
           </section>
 
           <section class="np-pane" id="np-track">
+            <button type="button" class="np-help" data-help="track" title="{{ button_help }}">?</button>
             <div class="np-grid">
               <label>{{ entry_cron_key }}
                 <input type="text" name="shipping_novaposhta_cron_key" value="{{ shipping_novaposhta_cron_key }}" />
@@ -294,6 +331,10 @@
                 </select>
               </label>
             </div>
+            <label>{{ entry_alert }}
+              <input type="text" name="shipping_novaposhta_alert_email" value="{{ shipping_novaposhta_alert_email }}" />
+              <small>{{ help_alert }}</small>
+            </label>
             <h3>{{ entry_status_map }}</h3>
             {% for code, label in {'7': text_status_7, '8': text_status_8, '9': text_status_9, '10': text_status_10, '102': text_status_102, '103': text_status_103} %}
             <div class="np-map">
@@ -315,6 +356,7 @@
           </section>
 
           <section class="np-pane" id="np-log">
+            <button type="button" class="np-help" data-help="log" title="{{ button_help }}">?</button>
             <table class="np-cn">
               <thead><tr><th></th><th>Method</th><th></th></tr></thead>
               <tbody>
@@ -331,96 +373,8 @@
             </table>
           </section>
 
-          <section class="np-pane" id="np-look">
-            <div class="np-look">
-              <div>
-                <label>{{ entry_color }}
-                  <input type="color" id="np-color" name="shipping_novaposhta_color" value="{{ shipping_novaposhta_color|default('#1c1917') }}" />
-                </label>
-                <div class="np-presets">
-                  <button type="button" data-color="#1c1917">{{ text_preset_dark }}</button>
-                  <button type="button" data-color="#da291c">{{ text_preset_red }}</button>
-                  <button type="button" data-color="#1d4ed8">{{ text_preset_blue }}</button>
-                </div>
-                <label>{{ entry_radius }}
-                  <input type="range" id="np-radius" name="shipping_novaposhta_radius" min="0" max="24" value="{{ shipping_novaposhta_radius|default('8') }}" />
-                  <small id="np-radius-val">{{ shipping_novaposhta_radius|default('8') }} px</small>
-                </label>
-                <label class="np-check">
-                  <input type="hidden" name="shipping_novaposhta_compact" value="0" />
-                  <input type="checkbox" id="np-compact" name="shipping_novaposhta_compact" value="1" {% if shipping_novaposhta_compact == '1' or shipping_novaposhta_compact == 1 %}checked{% endif %} />
-                  {{ entry_compact }}
-                </label>
-                <div class="np-grid">
-                  <label>{{ text_method_department }}<input type="text" id="np-label-branch" name="shipping_novaposhta_label_department" value="{{ shipping_novaposhta_label_department }}" /></label>
-                  <label>{{ text_method_poshtomat }}<input type="text" id="np-label-locker" name="shipping_novaposhta_label_poshtomat" value="{{ shipping_novaposhta_label_poshtomat }}" /></label>
-                </div>
-                <label>{{ text_method_doors }}<input type="text" id="np-label-doors" name="shipping_novaposhta_label_doors" value="{{ shipping_novaposhta_label_doors }}" /></label>
-              </div>
-              <div>
-                <h3>{{ text_preview }}</h3>
-                <div id="np-preview" class="np-preview">
-                  <div class="np-preview-types">
-                    <button type="button" class="is-on" data-kind="branch">{{ shipping_novaposhta_label_department|default(text_method_department) }}</button>
-                    <button type="button" data-kind="locker">{{ shipping_novaposhta_label_poshtomat|default(text_method_poshtomat) }}</button>
-                    <button type="button" data-kind="doors">{{ shipping_novaposhta_label_doors|default(text_method_doors) }}</button>
-                  </div>
-                  <div class="np-preview-input">{{ entry_field_warehouse }}</div>
-                </div>
-                <p class="np-note">{{ help_look }}</p>
-              </div>
-            </div>
-            <h3>{{ text_custom_fields }}</h3>
-            <p class="np-note">{{ help_custom_fields }}</p>
-            <div class="np-grid">
-              <label>{{ entry_field_city }}
-                <select name="shipping_novaposhta_field_city">
-                  <option value="0">{{ text_none }}</option>
-                  {% for field in custom_fields %}
-                  <option value="{{ field.id }}" {% if shipping_novaposhta_field_city == field.id %}selected{% endif %}>{{ field.label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label>{{ entry_field_warehouse }}
-                <select name="shipping_novaposhta_field_warehouse">
-                  <option value="0">{{ text_none }}</option>
-                  {% for field in custom_fields %}
-                  <option value="{{ field.id }}" {% if shipping_novaposhta_field_warehouse == field.id %}selected{% endif %}>{{ field.label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label>{{ entry_field_street }}
-                <select name="shipping_novaposhta_field_street">
-                  <option value="0">{{ text_none }}</option>
-                  {% for field in custom_fields %}
-                  <option value="{{ field.id }}" {% if shipping_novaposhta_field_street == field.id %}selected{% endif %}>{{ field.label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label>{{ entry_field_building }}
-                <select name="shipping_novaposhta_field_building">
-                  <option value="0">{{ text_none }}</option>
-                  {% for field in custom_fields %}
-                  <option value="{{ field.id }}" {% if shipping_novaposhta_field_building == field.id %}selected{% endif %}>{{ field.label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label>{{ entry_field_flat }}
-                <select name="shipping_novaposhta_field_flat">
-                  <option value="0">{{ text_none }}</option>
-                  {% for field in custom_fields %}
-                  <option value="{{ field.id }}" {% if shipping_novaposhta_field_flat == field.id %}selected{% endif %}>{{ field.label }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-            </div>
-            <label>{{ entry_alert }}
-              <input type="text" name="shipping_novaposhta_alert_email" value="{{ shipping_novaposhta_alert_email }}" />
-              <small>{{ help_alert }}</small>
-            </label>
-          </section>
-
           <section class="np-pane" id="np-versions">
+            <button type="button" class="np-help" data-help="versions" title="{{ button_help }}">?</button>
             <ul class="np-versions">
               {% for row in changelog %}
               <li class="{% if row.current %}is-current{% endif %}">
@@ -435,6 +389,14 @@
     </form>
   </div>
 </div>
+<div id="np-help" class="np-help-modal" hidden>
+  <div class="np-help-card">
+    <button type="button" class="np-help-x" aria-label="{{ button_help }}">×</button>
+    <h3 id="np-help-title"></h3>
+    <div id="np-help-text"></div>
+  </div>
+</div>
+<script type="application/json" id="np-help-data">{{ help_panes_json|raw }}</script>
 <style>
 .np-admin { --ink:#1c1917; --muted:#6f675e; --line:#e6e0d6; --paper:#f6f3ee; --red:#c81e1e; }
 .np-admin .np-shell { display:flex; gap:18px; align-items:flex-start; }
@@ -442,8 +404,15 @@
 .np-admin .np-nav button { display:block; width:100%; text-align:left; border:0; background:transparent; border-radius:10px; padding:10px 12px; color:var(--ink); font-weight:600; }
 .np-admin .np-nav button.is-on { background:#1c1917; color:#fff; }
 .np-admin .np-main { flex:1; min-width:0; background:#fff; border:1px solid var(--line); border-radius:16px; padding:22px; }
-.np-admin .np-pane { display:none; }
+.np-admin .np-pane { display:none; position:relative; padding:8px 44px 0 0; }
 .np-admin .np-pane.is-on { display:block; }
+.np-admin .np-help { position:absolute; top:0; right:0; width:32px; height:32px; border-radius:999px; border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:700; }
+.np-help-modal { position:fixed; inset:0; background:rgba(28,25,23,.45); z-index:10000; display:flex; align-items:center; justify-content:center; padding:24px; }
+.np-help-modal[hidden] { display:none; }
+.np-help-card { position:relative; background:#fff; color:var(--ink); width:100%; max-width:640px; max-height:80vh; overflow:auto; border-radius:16px; padding:22px 22px 18px; }
+.np-help-card h3 { margin:0 36px 12px 0; }
+.np-help-card #np-help-text { white-space:pre-line; line-height:1.5; }
+.np-help-x { position:absolute; top:12px; right:12px; width:32px; height:32px; border:0; border-radius:999px; background:#f6f3ee; font-size:20px; }
 .np-admin label { display:block; margin:0 0 14px; color:var(--muted); font-size:13px; font-weight:600; }
 .np-admin input, .np-admin select { display:block; width:100%; margin-top:6px; height:40px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); padding:0 12px; box-shadow:none; }
 .np-admin textarea.np-grow { display:block; width:100%; min-height:88px; margin-top:6px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); padding:10px 12px; resize:vertical; line-height:1.45; field-sizing:content; }
@@ -538,7 +507,7 @@
         }
         var select = $('#input-sender').empty();
         $.each(json.senders || [], function (_, row) {
-          select.append($('<option>').val(row.ref).text(row.name));
+          select.append($('<option>').val(row.ref).text(row.name).attr('data-real', '1'));
         });
         $('#api-check-result').text((saved.success || 'OK') + ' / ' + (json.senders || []).length);
         select.trigger('change');
@@ -546,6 +515,21 @@
     }, 'json');
   });
 
+  function chosenName($select) {
+    var $option = $select.find(':selected');
+    if ($option.attr('data-real') !== '1') return '';
+    var text = $.trim($option.text());
+    if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text)) return '';
+    return text;
+  }
+  function rememberNames() {
+    var sender = chosenName($('#input-sender'));
+    var contact = chosenName($('#input-contact'));
+    var address = chosenName($('#input-address'));
+    if (sender) $('#input-sender-name').val(sender);
+    if (contact) $('#input-contact-name').val(contact);
+    if (address) $('#input-address-name').val(address);
+  }
   $('#input-sender').on('change', function () {
     var ref = $(this).val();
     if (!ref) return;
@@ -553,15 +537,20 @@
       if (json.error) return;
       var contacts = $('#input-contact').empty();
       $.each(json.contacts || [], function (_, row) {
-        contacts.append($('<option>').val(row.ref).text(row.name).attr('data-phone', row.phone || ''));
+        contacts.append($('<option>').val(row.ref).text(row.name).attr('data-phone', row.phone || '').attr('data-real', '1'));
       });
       var addresses = $('#input-address').empty();
       $.each(json.addresses || [], function (_, row) {
-        addresses.append($('<option>').val(row.ref).text(row.name).attr('data-city', row.city_ref || ''));
+        addresses.append($('<option>').val(row.ref).text(row.name).attr('data-city', row.city_ref || '').attr('data-real', '1'));
       });
       contacts.trigger('change');
       addresses.trigger('change');
+      rememberNames();
     });
+  });
+
+  $('#input-contact, #input-address').on('change', function () {
+    rememberNames();
   });
 
   $('#input-contact').on('change', function () {
@@ -604,6 +593,7 @@
             return;
           }
           write('done');
+          button.text(button.data('label-update') || button.text());
           button.prop('disabled', false);
         },
         error: function (xhr) {
@@ -645,6 +635,7 @@
         $.getJSON('index.php?route=extension/shipping/novaposhta/senderData&user_token=' + token + '&ref=' + encodeURIComponent(this.value) + '&key=' + encodeURIComponent(key), function (data) {
           if (data.contacts && data.contacts[0]) {
             card.find('[name="shipping_novaposhta_senders[' + index + '][contact]"]').val(data.contacts[0].ref);
+            card.find('[name="shipping_novaposhta_senders[' + index + '][contact_name]"]').val(data.contacts[0].name);
             card.find('[name="shipping_novaposhta_senders[' + index + '][phone]"]').val(data.contacts[0].phone);
           }
           if (data.addresses && data.addresses[0]) {
@@ -657,30 +648,17 @@
     }, 'json');
   });
 
-  function paintPreview() {
-    var color = $('#np-color').val() || '#1c1917';
-    var radius = $('#np-radius').val() || '8';
-    var box = $('#np-preview');
-    $('#np-radius-val').text(radius + ' px');
-    box.toggleClass('is-compact', $('#np-compact').is(':checked'));
-    if ($.trim($('#np-label-branch').val())) box.find('[data-kind="branch"]').text($('#np-label-branch').val());
-    if ($.trim($('#np-label-locker').val())) box.find('[data-kind="locker"]').text($('#np-label-locker').val());
-    if ($.trim($('#np-label-doors').val())) box.find('[data-kind="doors"]').text($('#np-label-doors').val());
-    box.find('button, .np-preview-input').css('border-radius', radius + 'px');
-    box.find('button.is-on').css({ background: color, borderColor: color, color: '#fff' });
-    box.find('button').not('.is-on').css({ background: '#fff', borderColor: '#e4e0d8', color: '#1c1917' });
-  }
-  $('#np-color, #np-radius, #np-compact, #np-label-branch, #np-label-locker, #np-label-doors').on('input change', paintPreview);
-  $('.np-presets button').on('click', function () {
-    $('#np-color').val($(this).data('color'));
-    paintPreview();
+  var help = {};
+  try { help = JSON.parse($('#np-help-data').text() || '{}'); } catch (e) { help = {}; }
+  $('.np-help').on('click', function () {
+    var pane = help[$(this).data('help')] || {};
+    $('#np-help-title').text(pane.title || '');
+    $('#np-help-text').text(pane.text || '');
+    $('#np-help').removeAttr('hidden');
   });
-  $('#np-preview').on('click', 'button', function () {
-    $('#np-preview button').removeClass('is-on');
-    $(this).addClass('is-on');
-    paintPreview();
+  $('.np-help-x, #np-help').on('click', function (e) {
+    if (e.target === this) $('#np-help').attr('hidden', 'hidden');
   });
-  paintPreview();
 })();
 </script>
 {{ footer }}

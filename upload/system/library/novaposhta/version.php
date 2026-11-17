@@ -1,4 +1,4 @@
 <?php
 class NovaposhtaVersion {
-	const NUMBER = '1.5.1';
+	const NUMBER = '1.6.0';
 }
