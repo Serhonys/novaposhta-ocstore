@@ -1,5 +1,5 @@
 <?php
-$_['heading_title'] = 'Nova Poshta 1.6.4';
+$_['heading_title'] = 'Nova Poshta 1.6.5';
 $_['text_home'] = 'Home';
 $_['text_extension'] = 'Extensions';
 $_['text_success'] = 'Nova Poshta settings saved';
@@ -199,6 +199,7 @@ $_['text_sender_city_ph'] = 'Kremenchuk';
 $_['text_sender_wh_ph'] = '3 or Svobody';
 $_['help_sender_pick'] = 'The Nova Poshta cabinet often does not return its saved addresses. Type the city, then the branch number or street. The list comes from the downloaded directory.';
 $_['changelog'] = array(
+	'1.6.5' => 'City and branch fields stay after the delivery block refreshes.',
 	'1.6.4' => 'Checkout draws city and branch under the selected Nova Poshta method.',
 	'1.6.2' => 'Sender branch is picked from the directory: city, then branch.',
 	'1.6.1' => 'Sender address from the Nova Poshta cabinet: city and branch, not a placeholder.',

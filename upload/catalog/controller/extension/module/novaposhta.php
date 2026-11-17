@@ -8,8 +8,8 @@ class ControllerExtensionModuleNovaposhta extends Controller {
 			return;
 		}
 
-		$this->document->addScript('catalog/view/javascript/novaposhta.js?v=1.6.4');
-		$this->document->addStyle('catalog/view/theme/default/stylesheet/novaposhta.css?v=1.6.4');
+		$this->document->addScript('catalog/view/javascript/novaposhta.js?v=1.6.5');
+		$this->document->addStyle('catalog/view/theme/default/stylesheet/novaposhta.css?v=1.6.5');
 	}
 
 	public function eventHeaderAfter(&$route, &$data, &$output) {

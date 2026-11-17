@@ -200,10 +200,41 @@
     });
   }
 
+  function remember() {
+    var c = cfg();
+    if (!c) return;
+    c.saved = c.saved || {};
+    var $city = $('.np-own-city');
+    if (!$city.length) return;
+    c.saved.city_name = $city.val() || '';
+    c.saved.city_ref = $city.data('np-ref') || c.saved.city_ref || '';
+    c.saved.settlement_ref = $city.data('np-settlement') || c.saved.settlement_ref || '';
+    var $point = $('.np-own-point');
+    if ($point.length) {
+      c.saved.division_name = $point.val() || '';
+      c.saved.division_ref = $point.data('np-ref') || '';
+      c.saved.division_id = $point.data('np-id') || '';
+    }
+    var $street = $('.np-own-street');
+    if ($street.length) {
+      c.saved.street_name = $street.val() || '';
+      c.saved.street_ref = $street.data('np-ref') || '';
+    }
+    var $building = $('.np-own-building');
+    if ($building.length) c.saved.building = $building.val() || '';
+    var $flat = $('.np-own-flat');
+    if ($flat.length) c.saved.flat = $flat.val() || '';
+  }
+
   function checkoutHasCity() {
     var c = cfg();
-    var $city = nodes(c && c.city, 'input[name="city"], input[name="shipping_address[city]"]').not('.np-own-city');
-    return $city.filter(':visible').length > 0;
+    var $city = nodes(c && c.city, 'input[name="city"], input[name="shipping_address[city]"]')
+      .not('.np-own-city')
+      .filter(':visible')
+      .filter(function () {
+        return !$(this).closest('.np-checkout').length;
+      });
+    return $city.length > 0;
   }
 
   function field(cls, label, value) {
@@ -220,7 +251,6 @@
     if (!c) return;
     var $radio = npRadio();
     if (!$radio.length || checkoutHasCity()) {
-      $('.np-checkout').remove();
       return;
     }
     var kind = method();
@@ -228,6 +258,7 @@
     if ($box.length && $box.data('np-kind') === kind && $.contains(document, $box[0])) {
       return;
     }
+    remember();
     $('.np-checkout').remove();
     var labels = c.labels || {};
     var saved = c.saved || {};
@@ -252,9 +283,12 @@
     if (saved.street_ref) $street.data('np-ref', saved.street_ref).data('np-label', saved.street_name || '');
     var $card = $radio.closest('label');
     if (!$card.length || $card.outerWidth() < 160) {
-      $card = $radio.closest('div, li, tr, p');
+      $card = $radio.parent();
     }
-    if ($card.length) {
+    var $root = $card.parent();
+    if ($root.length && $root[0] !== document.body) {
+      $box.insertAfter($root);
+    } else if ($card.length) {
       $box.insertAfter($card);
     } else {
       $radio.parent().after($box);
@@ -276,8 +310,15 @@
     bind(nodes(c.flat).not('.np-own-flat'), 'text');
   }
 
+  var scanTimer;
+  function schedule() {
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(scan, 80);
+    setTimeout(scan, 400);
+  }
+
   $(document).on('change', 'input[type="radio"]', function () {
-    setTimeout(scan, 40);
+    schedule();
   });
 
   $(document).on('click', function (e) {
@@ -286,12 +327,18 @@
     }
   });
 
-  $(document).on('ajaxComplete', function (e, xhr, settings) {
-    if (!settings || !settings.url) return;
-    if (settings.url.indexOf('checkout') !== -1 || settings.url.indexOf('simplecheckout') !== -1) {
-      scan();
-    }
+  $(document).on('ajaxComplete', function () {
+    schedule();
   });
+
+  if (window.MutationObserver && document.body) {
+    var observer = new MutationObserver(function () {
+      if (npRadio().length && !$('.np-checkout').filter(function () { return $.contains(document, this); }).length && !checkoutHasCity()) {
+        schedule();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
 
   $(scan);
 })(window.jQuery);
