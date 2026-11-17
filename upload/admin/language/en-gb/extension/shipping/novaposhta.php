@@ -1,5 +1,5 @@
 <?php
-$_['heading_title'] = 'Nova Poshta 1.6.2';
+$_['heading_title'] = 'Nova Poshta 1.6.3';
 $_['text_home'] = 'Home';
 $_['text_extension'] = 'Extensions';
 $_['text_success'] = 'Nova Poshta settings saved';
