@@ -800,14 +800,12 @@ class NovaposhtaService {
 		}
 
 		$cargo = $this->orderCargo($order['order_id']);
-		$description = !empty($input['description']) ? $input['description'] : $this->config->get('shipping_novaposhta_cargo_description');
-		$description = str_replace(
-			array('{order_id}', '{firstname}', '{lastname}'),
-			array($order['order_id'], $order['firstname'], $order['lastname']),
-			(string)$description
-		);
-		$generic = ($description === '' || $description === ('Замовлення ' . $order['order_id']));
-		if ($generic && $cargo['description'] !== '') {
+		$template = !empty($input['description']) ? $input['description'] : $this->config->get('shipping_novaposhta_cargo_description');
+		if ($template === '' || $template === null) {
+			$template = 'Замовлення {order_id}';
+		}
+		$description = $this->applyDescription($template, $order, $cargo);
+		if (($description === '' || $description === ('Замовлення ' . $order['order_id'])) && $cargo['description'] !== '') {
 			$description = $cargo['description'];
 		}
 		if ($description === '') {

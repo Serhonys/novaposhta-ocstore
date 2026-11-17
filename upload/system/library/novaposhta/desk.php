@@ -23,22 +23,32 @@ trait NovaposhtaDesk {
 	public function orderCargo($orderId) {
 		$weightClass = $this->unitClass('weight', array('kg', 'кг'));
 		$lengthClass = $this->unitClass('length', array('cm', 'см'));
-		$query = $this->db->query("SELECT op.name, op.quantity, p.weight, p.weight_class_id, p.length, p.width, p.height, p.length_class_id
+		$query = $this->db->query("SELECT op.name, op.model, op.quantity, p.sku, p.weight, p.weight_class_id, p.length, p.width, p.height, p.length_class_id
 			FROM `" . DB_PREFIX . "order_product` op
 			LEFT JOIN `" . DB_PREFIX . "product` p ON p.product_id = op.product_id
 			WHERE op.order_id = '" . (int)$orderId . "'");
 
 		$names = array();
+		$models = array();
+		$skus = array();
+		$qty = 0;
 		$weight = 0;
 		$places = array();
 		foreach ($query->rows as $row) {
-			$qty = max(1, (int)$row['quantity']);
-			$names[] = $row['name'] . ($qty > 1 ? ' ×' . $qty : '');
+			$piece = max(1, (int)$row['quantity']);
+			$names[] = $row['name'] . ($piece > 1 ? ' ×' . $piece : '');
+			if ($row['model'] !== '') {
+				$models[] = $row['model'];
+			}
+			if (!empty($row['sku'])) {
+				$skus[] = $row['sku'];
+			}
+			$qty += $piece;
 			$w = (float)$row['weight'];
 			if ($weightClass && $this->weight && $row['weight_class_id']) {
 				$w = $this->weight->convert($w, $row['weight_class_id'], $weightClass);
 			}
-			$weight += $w * $qty;
+			$weight += $w * $piece;
 			$l = (float)$row['length'];
 			$wd = (float)$row['width'];
 			$h = (float)$row['height'];
@@ -49,7 +59,7 @@ trait NovaposhtaDesk {
 			}
 			if ($w > 0 || $l > 0) {
 				$places[] = array(
-					'weight' => $w > 0 ? $w * $qty : 0.1,
+					'weight' => $w > 0 ? $w * $piece : 0.1,
 					'length' => (int)round($l),
 					'width'  => (int)round($wd),
 					'height' => (int)round($h)
@@ -57,7 +67,8 @@ trait NovaposhtaDesk {
 			}
 		}
 
-		$description = implode(', ', $names);
+		$products = implode(', ', $names);
+		$description = $products;
 		if (function_exists('mb_substr')) {
 			$description = mb_substr($description, 0, 100, 'UTF-8');
 		} else {
@@ -72,9 +83,66 @@ trait NovaposhtaDesk {
 
 		return array(
 			'description' => $description,
+			'products'    => $products,
+			'models'      => implode(', ', $models),
+			'skus'        => implode(', ', $skus),
+			'qty'         => $qty,
 			'weight'      => round($weight, 3),
 			'places'      => $places
 		);
+	}
+
+	public function applyDescription($template, array $order, array $cargo = array()) {
+		$phone = isset($order['telephone']) ? preg_replace('/\D+/', '', $order['telephone']) : '';
+		$city = '';
+		if (!empty($order['shipping_city'])) {
+			$city = $order['shipping_city'];
+		} elseif (!empty($order['payment_city'])) {
+			$city = $order['payment_city'];
+		}
+		$date = '';
+		if (!empty($order['date_added'])) {
+			$ts = strtotime($order['date_added']);
+			$date = $ts ? date('d.m.Y', $ts) : $order['date_added'];
+		}
+		$cost = isset($order['total']) ? (string)round($this->toUah($order['total'])) : '';
+		$company = '';
+		if (!empty($order['shipping_company'])) {
+			$company = $order['shipping_company'];
+		} elseif (!empty($order['payment_company'])) {
+			$company = $order['payment_company'];
+		}
+		$seats = !empty($cargo['places']) ? count($cargo['places']) : 1;
+		$map = array(
+			'{order_id}'  => isset($order['order_id']) ? $order['order_id'] : '',
+			'{firstname}' => isset($order['firstname']) ? $order['firstname'] : '',
+			'{lastname}'  => isset($order['lastname']) ? $order['lastname'] : '',
+			'{phone}'     => $phone,
+			'{telephone}' => $phone,
+			'{email}'     => isset($order['email']) ? $order['email'] : '',
+			'{city}'      => $city,
+			'{address}'   => isset($order['shipping_address_1']) ? $order['shipping_address_1'] : '',
+			'{company}'   => $company,
+			'{products}'  => !empty($cargo['products']) ? $cargo['products'] : (isset($cargo['description']) ? $cargo['description'] : ''),
+			'{models}'    => isset($cargo['models']) ? $cargo['models'] : '',
+			'{sku}'       => isset($cargo['skus']) ? $cargo['skus'] : '',
+			'{qty}'       => isset($cargo['qty']) ? $cargo['qty'] : '',
+			'{weight}'    => isset($cargo['weight']) ? $cargo['weight'] : '',
+			'{seats}'     => $seats,
+			'{cost}'      => $cost,
+			'{date}'      => $date,
+			'{comment}'   => isset($order['comment']) ? trim(preg_replace('/\s+/u', ' ', strip_tags($order['comment']))) : '',
+			'{payment}'   => isset($order['payment_method']) ? trim(strip_tags($order['payment_method'])) : '',
+			'{shipping}'  => isset($order['shipping_method']) ? trim(strip_tags($order['shipping_method'])) : ''
+		);
+		$text = strtr((string)$template, $map);
+		$text = trim(preg_replace('/\s+/u', ' ', $text));
+		if (function_exists('mb_substr')) {
+			$text = mb_substr($text, 0, 120, 'UTF-8');
+		} else {
+			$text = substr($text, 0, 120);
+		}
+		return $text;
 	}
 
 	public function cargoType(array $input) {
@@ -358,8 +426,13 @@ trait NovaposhtaDesk {
 			$cost = round($this->toUah($order['total']));
 		}
 		$description = !empty($input['description']) ? $input['description'] : '';
+		$cargo = $this->orderCargo($orderId);
 		if ($description === '') {
-			$cargo = $this->orderCargo($orderId);
+			$template = (string)$this->config->get('shipping_novaposhta_cargo_description');
+			$description = $template !== '' ? $template : 'Замовлення {order_id}';
+		}
+		$description = $this->applyDescription($description, $order, $cargo);
+		if ($description === '' || $description === ('Замовлення ' . $orderId)) {
 			$description = $cargo['description'] !== '' ? $cargo['description'] : ('Замовлення ' . $orderId);
 		}
 		$props = array(

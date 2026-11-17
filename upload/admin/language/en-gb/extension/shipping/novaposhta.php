@@ -1,5 +1,5 @@
 <?php
-$_['heading_title'] = 'Nova Poshta 1.5.0';
+$_['heading_title'] = 'Nova Poshta 1.5.1';
 $_['text_home'] = 'Home';
 $_['text_extension'] = 'Extensions';
 $_['text_success'] = 'Nova Poshta settings saved';
@@ -66,7 +66,7 @@ $_['entry_declared'] = 'Declared value, UAH';
 $_['entry_seats'] = 'Seats';
 $_['help_country'] = 'Pick Ukraine so the Nova Poshta fields stay hidden for other countries.';
 $_['help_weight'] = 'Cart weight comes from products. This value is used when a product has no weight.';
-$_['help_description'] = 'Tokens: {order_id}, {firstname}, {lastname}.';
+$_['help_description'] = "You can insert:\n{order_id} — 1042\n{firstname} — Ivan\n{lastname} — Petrenko\n{phone} — 380501112233\n{email} — ivan@shop.ua\n{city} — Kyiv\n{address} — Khreshchatyk 1\n{company} — Romashka LLC\n{products} — T-shirt ×2, Sneakers\n{models} — TS-01, SH-22\n{sku} — 1001, 1002\n{qty} — 3\n{weight} — 1.25\n{seats} — 2\n{cost} — 890\n{date} — 17.11.2026\n{comment} — Call me\n{payment} — Cash on delivery\n{shipping} — Nova Poshta\nExample: Order {order_id}, {firstname} {lastname} — {products}\nBecomes: Order 1042, Ivan Petrenko — T-shirt ×2, Sneakers\nNova Poshta keeps 120 characters. Drag the bottom edge to resize.";
 $_['help_cod'] = 'If the customer picks one of these payments, the delivery price includes the COD fee and the waybill carries the cash amount.';
 $_['help_api_calc'] = 'If the API is down or the city is not chosen yet, the grid below is used. If that is empty too, the method is hidden.';
 $_['help_tariff'] = 'Amounts in hryvnia. A row means “up to this weight”. Zones: same city, same region, rest of Ukraine. Doors and locker are surcharges.';
@@ -171,6 +171,7 @@ $_['text_loc_account'] = 'account';
 $_['text_loc_affiliate'] = 'affiliate';
 $_['tab_versions'] = 'Versions';
 $_['changelog'] = array(
+	'1.5.1' => 'Cargo description: full token list with an example and a resizable field.',
 	'1.5.0' => 'City and warehouse on the order, cargo from products, TTN queue, stored registries, manager emails, tabs and status colors, checkout look and custom fields, TTN edit, cargo types, EDRPOU, customer warehouse change, warehouse hours and courier intervals. Version in the admin and in the file name.',
 	'1.4.0' => 'Multiple seats, batch TTN and 100×100 print, courier call, backward delivery, My parcels, multiple senders, warehouse map, recipient reuse by phone.',
 	'1.3.0' => 'Batch TTN, registry, API log, delivery date, remembered city and warehouse, email and SMS, COD paid status, nearest warehouse.',

@@ -383,6 +383,14 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 		$row = $service->getOrderRow((int)$order['order_id']);
 
 		$cargo = $service->orderCargo((int)$order['order_id']);
+		$template = (string)$this->config->get('shipping_novaposhta_cargo_description');
+		if ($template === '') {
+			$template = 'Замовлення {order_id}';
+		}
+		$description = $service->applyDescription($template, $order, $cargo);
+		if (($description === '' || $description === ('Замовлення ' . $order['order_id'])) && $cargo['description'] !== '') {
+			$description = $cargo['description'];
+		}
 		$view = array(
 			'order_id'    => (int)$order['order_id'],
 			'user_token'  => $this->session->data['user_token'],
@@ -390,7 +398,7 @@ class ControllerExtensionShippingNovaposhta extends Controller {
 			'telephone'   => $order['telephone'],
 			'total'       => round($service->toUah($order['total'])),
 			'weight'      => $cargo['weight'],
-			'description' => $cargo['description'] !== '' ? $cargo['description'] : str_replace('{order_id}', $order['order_id'], (string)$this->config->get('shipping_novaposhta_cargo_description')),
+			'description' => $description,
 			'places'      => $cargo['places'],
 			'payer'       => $this->config->get('shipping_novaposhta_payer') ? $this->config->get('shipping_novaposhta_payer') : 'Recipient',
 			'payment'     => $this->config->get('shipping_novaposhta_payment') ? $this->config->get('shipping_novaposhta_payment') : 'Cash',
