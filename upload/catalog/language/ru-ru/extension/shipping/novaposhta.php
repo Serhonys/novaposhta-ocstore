@@ -7,6 +7,7 @@ $_['text_free'] = 'Бесплатно';
 $_['text_days'] = '%s дн.';
 $_['entry_city'] = 'Город';
 $_['entry_point'] = 'Отделение или номер';
+$_['entry_locker'] = 'Почтомат';
 $_['entry_street'] = 'Улица';
 $_['entry_building'] = 'Дом';
 $_['entry_flat'] = 'Квартира';

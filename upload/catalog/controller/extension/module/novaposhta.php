@@ -8,8 +8,8 @@ class ControllerExtensionModuleNovaposhta extends Controller {
 			return;
 		}
 
-		$this->document->addScript('catalog/view/javascript/novaposhta.js');
-		$this->document->addStyle('catalog/view/theme/default/stylesheet/novaposhta.css');
+		$this->document->addScript('catalog/view/javascript/novaposhta.js?v=1.6.4');
+		$this->document->addStyle('catalog/view/theme/default/stylesheet/novaposhta.css?v=1.6.4');
 	}
 
 	public function eventHeaderAfter(&$route, &$data, &$output) {
@@ -36,7 +36,27 @@ class ControllerExtensionModuleNovaposhta extends Controller {
 			'street'       => (string)$this->config->get('shipping_novaposhta_checkout_street'),
 			'building'     => (string)$this->config->get('shipping_novaposhta_checkout_building'),
 			'flat'         => (string)$this->config->get('shipping_novaposhta_checkout_flat'),
-			'method'       => !empty($saved['method']) ? $saved['method'] : 'department'
+			'method'       => !empty($saved['method']) ? $saved['method'] : 'department',
+			'labels'       => array(
+				'city'     => $this->language->get('entry_city'),
+				'point'    => $this->language->get('entry_point'),
+				'locker'   => $this->language->get('entry_locker'),
+				'street'   => $this->language->get('entry_street'),
+				'building' => $this->language->get('entry_building'),
+				'flat'     => $this->language->get('entry_flat')
+			),
+			'saved'        => array(
+				'city_name'      => isset($saved['city_name']) ? $saved['city_name'] : '',
+				'city_ref'       => isset($saved['city_ref']) ? $saved['city_ref'] : '',
+				'division_name'  => isset($saved['division_name']) ? $saved['division_name'] : '',
+				'division_ref'   => isset($saved['division_ref']) ? $saved['division_ref'] : '',
+				'division_id'    => isset($saved['division_id']) ? $saved['division_id'] : '',
+				'street_name'    => isset($saved['street_name']) ? $saved['street_name'] : '',
+				'street_ref'     => isset($saved['street_ref']) ? $saved['street_ref'] : '',
+				'building'       => isset($saved['building']) ? $saved['building'] : '',
+				'flat'           => isset($saved['flat']) ? $saved['flat'] : '',
+				'settlement_ref' => isset($saved['settlement_ref']) ? $saved['settlement_ref'] : ''
+			)
 		);
 
 		$output .= '<script>window.NovaPoshtaConfig=' . json_encode($config, JSON_UNESCAPED_UNICODE) . ';</script>';

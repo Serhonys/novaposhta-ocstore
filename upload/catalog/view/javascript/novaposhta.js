@@ -41,13 +41,33 @@
     return $found.filter(':visible').length ? $found.filter(':visible') : $found;
   }
 
+  function npRadio() {
+    var $radios = $('input[type="radio"]').filter(function () {
+      return String(this.value || '').indexOf('novaposhta.') !== -1;
+    });
+    var $checked = $radios.filter(':checked');
+    return $checked.length ? $checked.first() : $();
+  }
+
   function method() {
-    var $checked = $('input[name="shipping_method"]:checked');
-    if ($checked.length && String($checked.val()).indexOf('novaposhta.') === 0) {
-      return String($checked.val()).split('.')[1];
+    var $checked = npRadio();
+    if ($checked.length) {
+      var parts = String($checked.val()).split('.');
+      return parts.length > 1 ? parts[1] : 'department';
+    }
+    var named = $('input[name="shipping_method"]:checked');
+    if (named.length && String(named.val()).indexOf('novaposhta.') === 0) {
+      return String(named.val()).split('.')[1];
     }
     var c = cfg();
     return (c && c.method) || 'department';
+  }
+
+  function cityInput() {
+    var $own = $('.np-own-city:visible').first();
+    if ($own.length) return $own;
+    var c = cfg();
+    return nodes(c && c.city, 'input[name="city"], input[name="shipping_address[city]"]').not('.np-own-city').first();
   }
 
   function allowed($input) {
@@ -82,11 +102,17 @@
 
   function payload() {
     var c = cfg();
-    var $city = nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]').first();
-    var $point = nodes(c.point, 'input[name="address_1"], input[name="shipping_address[address_1]"]').first();
-    var $street = nodes(c.street).first();
-    var $building = nodes(c.building).first();
-    var $flat = nodes(c.flat).first();
+    var $city = cityInput();
+    var $point = $('.np-own-point:visible').first();
+    if (!$point.length) {
+      $point = nodes(c.point, 'input[name="address_1"], input[name="shipping_address[address_1]"]').not('.np-own-point').first();
+    }
+    var $street = $('.np-own-street:visible').first();
+    if (!$street.length) $street = nodes(c.street).not('.np-own-street').first();
+    var $building = $('.np-own-building:visible').first();
+    if (!$building.length) $building = nodes(c.building).not('.np-own-building').first();
+    var $flat = $('.np-own-flat:visible').first();
+    if (!$flat.length) $flat = nodes(c.flat).not('.np-own-flat').first();
     return {
       method: method(),
       city_ref: $city.data('np-ref') || '',
@@ -149,7 +175,7 @@
           return;
         }
         if (kind === 'point') {
-          var cityRef = nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]').first().data('np-ref') || '';
+          var cityRef = cityInput().data('np-ref') || '';
           var locker = method() === 'poshtomat' ? 1 : 0;
           $.getJSON(c.warehouseUrl, { city_ref: cityRef, q: q, locker: locker }, function (rows) {
             list($input, rows || [], function (row) {
@@ -160,7 +186,7 @@
           return;
         }
         if (kind === 'street') {
-          var settlement = nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]').first().data('np-settlement') || '';
+          var settlement = cityInput().data('np-settlement') || '';
           if (!settlement) return;
           $.getJSON(c.streetUrl, { settlement_ref: settlement, q: q }, function (rows) {
             list($input, rows || [], function (row) {
@@ -174,15 +200,85 @@
     });
   }
 
+  function checkoutHasCity() {
+    var c = cfg();
+    var $city = nodes(c && c.city, 'input[name="city"], input[name="shipping_address[city]"]').not('.np-own-city');
+    return $city.filter(':visible').length > 0;
+  }
+
+  function field(cls, label, value) {
+    var $label = $('<label class="np-field"></label>');
+    $label.append($('<span></span>').text(label || ''));
+    var $input = $('<input type="text" autocomplete="off" class="form-control">').addClass(cls);
+    if (value) $input.val(value);
+    $label.append($input);
+    return $label;
+  }
+
+  function mount() {
+    var c = cfg();
+    if (!c) return;
+    var $radio = npRadio();
+    if (!$radio.length || checkoutHasCity()) {
+      $('.np-checkout').remove();
+      return;
+    }
+    var kind = method();
+    var $box = $('.np-checkout');
+    if ($box.length && $box.data('np-kind') === kind && $.contains(document, $box[0])) {
+      return;
+    }
+    $('.np-checkout').remove();
+    var labels = c.labels || {};
+    var saved = c.saved || {};
+    $box = $('<div class="np-checkout"></div>').data('np-kind', kind);
+    $box.append(field('np-own-city', labels.city || 'Місто', saved.city_name));
+    if (kind === 'doors') {
+      var $door = $('<div class="np-door-row"></div>');
+      $door.append(field('np-own-street', labels.street || 'Вулиця', saved.street_name));
+      $door.append(field('np-own-building', labels.building || 'Будинок', saved.building));
+      $door.append(field('np-own-flat', labels.flat || 'Квартира', saved.flat));
+      $box.append($door);
+    } else {
+      var pointLabel = kind === 'poshtomat' ? (labels.locker || 'Поштомат') : (labels.point || 'Відділення');
+      $box.append(field('np-own-point', pointLabel, saved.division_name));
+    }
+    var $city = $box.find('.np-own-city');
+    if (saved.city_ref) $city.data('np-ref', saved.city_ref).data('np-label', saved.city_name || '');
+    if (saved.settlement_ref) $city.data('np-settlement', saved.settlement_ref);
+    var $point = $box.find('.np-own-point');
+    if (saved.division_ref) $point.data('np-ref', saved.division_ref).data('np-id', saved.division_id || '').data('np-label', saved.division_name || '');
+    var $street = $box.find('.np-own-street');
+    if (saved.street_ref) $street.data('np-ref', saved.street_ref).data('np-label', saved.street_name || '');
+    var $card = $radio.closest('label');
+    if (!$card.length || $card.outerWidth() < 160) {
+      $card = $radio.closest('div, li, tr, p');
+    }
+    if ($card.length) {
+      $box.insertAfter($card);
+    } else {
+      $radio.parent().after($box);
+    }
+    bind($box.find('.np-own-city'), 'city');
+    bind($box.find('.np-own-point'), 'point');
+    bind($box.find('.np-own-street'), 'street');
+    bind($box.find('.np-own-building, .np-own-flat'), 'text');
+  }
+
   function scan() {
     var c = cfg();
     if (!c) return;
-    bind(nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]'), 'city');
-    bind(nodes(c.point, 'input[name="address_1"], input[name="shipping_address[address_1]"]'), 'point');
-    bind(nodes(c.street), 'street');
-    bind(nodes(c.building), 'text');
-    bind(nodes(c.flat), 'text');
+    mount();
+    bind(nodes(c.city, 'input[name="city"], input[name="shipping_address[city]"]').not('.np-own-city'), 'city');
+    bind(nodes(c.point, 'input[name="address_1"], input[name="shipping_address[address_1]"]').not('.np-own-point'), 'point');
+    bind(nodes(c.street).not('.np-own-street'), 'street');
+    bind(nodes(c.building).not('.np-own-building'), 'text');
+    bind(nodes(c.flat).not('.np-own-flat'), 'text');
   }
+
+  $(document).on('change', 'input[type="radio"]', function () {
+    setTimeout(scan, 40);
+  });
 
   $(document).on('click', function (e) {
     if (!$(e.target).closest('.np-list, input, textarea').length) {

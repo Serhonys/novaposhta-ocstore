@@ -7,6 +7,7 @@ $_['text_free'] = 'Free';
 $_['text_days'] = '%s days';
 $_['entry_city'] = 'City';
 $_['entry_point'] = 'Branch or number';
+$_['entry_locker'] = 'Parcel locker';
 $_['entry_street'] = 'Street';
 $_['entry_building'] = 'Building';
 $_['entry_flat'] = 'Flat';

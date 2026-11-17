@@ -1,4 +1,9 @@
-.np-box { margin-top: 8px; }
+.np-checkout { margin: 10px 0 14px; display: grid; gap: 8px; }
+.np-checkout .np-field { display: grid; gap: 4px; margin: 0; font-weight: 600; }
+.np-checkout .np-field span { font-size: 13px; }
+.np-checkout .form-control { width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid #e4e0d8; border-radius: 10px; background: #fff; }
+.np-checkout .np-door-row { display: flex; gap: 8px; }
+.np-checkout .np-door-row .np-field { flex: 1; }
 .np-types { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .np-types button {
   border: 1px solid #e4e0d8;
