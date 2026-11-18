@@ -920,6 +920,273 @@ function closeCreateModal() {
 }
 
 /* ========================================================================= */
+/* РЕАЛЬНЫЕ ВЫЗОВЫ API (не локальные заглушки)                               */
+/* ========================================================================= */
+function npKey() {
+  const settings = npSettings();
+  return {
+    key: String(settings.connection && settings.connection.apiKey || "").trim(),
+    timeout: settings.connection && settings.connection.timeoutSec
+  };
+}
+function npDate(d) {
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
+}
+function needKey(action) {
+  const pack = npKey();
+  if (pack.key.length < 32) {
+    showApiToast(action, "Нужен API-ключ в настройках. Демо-строки в кабинет Новой Почты не отправляются.", "bad");
+    return null;
+  }
+  return pack;
+}
+function needDoc(wb, action) {
+  const pack = needKey(action);
+  if (!pack) return null;
+  if (!wb || !wb.ref) {
+    showApiToast(action, "У накладной нет Ref Новой Почты. Создайте ЭН или дождитесь загрузки из кабинета.", "bad");
+    return null;
+  }
+  return pack;
+}
+function mapCabinetDoc(row, i) {
+  const ttn = String(row.IntDocNumber || row.Number || "");
+  const phone = String(row.RecipientsPhone || row.RecipientPhone || "");
+  const city = row.CityRecipientDescription || "";
+  const point = row.RecipientAddressDescription || "";
+  const cost = Number(row.Cost || 0);
+  const codAmount = Number(row.AfterpaymentOnGoodsCost || 0);
+  const stateId = String(row.StateId || "1");
+  const sheetRef = row.ScanSheetRef || row.ScanSheetNumber || null;
+  return {
+    id: "np-" + (row.Ref || ttn || i),
+    ttn,
+    ref: row.Ref || "",
+    real: true,
+    createdAt: row.DateTime || "",
+    orderId: row.InfoRegClientBarcodes || (ttn ? "ТТН " + ttn.slice(-6) : "—"),
+    recipient: row.RecipientContactPerson || row.RecipientName || row.RecipientDescription || "Отримувач",
+    phone,
+    city,
+    point,
+    pointKind: /поштомат/i.test(point) ? "postomat" : "branch",
+    serviceType: row.ServiceType || "WarehouseWarehouse",
+    warehouseIndex: "",
+    weight: Number(row.Weight || 1),
+    dimensions: "",
+    cost,
+    cod: codAmount > 0,
+    codAmount,
+    payer: row.PayerType || "Recipient",
+    shippingCost: Number(row.CostOnSite || 0),
+    statusCategory: categoryFromCode(stateId) || "new",
+    statusCode: stateId,
+    statusText: row.StateName || "Документ из кабинета Новой Почты",
+    storageNote: row.RecipientAddressDescription || "",
+    scanSheetId: sheetRef,
+    description: row.Description || "",
+    timeline: [{ time: row.DateTime || "", place: city, text: row.StateName || "Загружено из кабинета", done: true }]
+  };
+}
+function mapCabinetSheet(row, i) {
+  return {
+    id: row.Ref || ("sheet-" + i),
+    ref: row.Ref || "",
+    number: row.Number ? ("Реестр " + row.Number) : ("Реестр " + (i + 1)),
+    date: row.DateTime || "",
+    status: "open",
+    docCount: Number(row.Count || row.DocumentsCount || 0)
+  };
+}
+async function loadCabinet() {
+  const pack = npKey();
+  if (pack.key.length < 32) {
+    showApiToast("InternetDocument.getDocumentList", "Сейчас на экране демо-накладные. Вставьте API-ключ в настройках — таблица загрузится из кабинета.", "bad");
+    return;
+  }
+  showApiToast("InternetDocument.getDocumentList", "Загрузка накладных из кабинета…");
+  const today = new Date();
+  const from = new Date(today.getTime() - 30 * 86400000);
+  const [docs, sheets] = await Promise.all([
+    npCall("InternetDocument", "getDocumentList", {
+      DateTimeFrom: npDate(from),
+      DateTimeTo: npDate(today),
+      Page: "1",
+      Limit: "50",
+      GetFullList: "0"
+    }, pack.key, pack.timeout),
+    npCall("ScanSheet", "getScanSheetList", {}, pack.key, pack.timeout)
+  ]);
+  if (!docs || docs.success === false) {
+    showApiToast("InternetDocument.getDocumentList", npErrorText(docs), "bad");
+    return;
+  }
+  const orders = waybills.filter((w) => String(w.id).indexOf("order-") === 0 && !w.ref);
+  const rows = Array.isArray(docs.data) ? docs.data.map(mapCabinetDoc) : [];
+  waybills = rows.concat(orders);
+  if (sheets && sheets.success && Array.isArray(sheets.data)) {
+    scanSheets = sheets.data.map(mapCabinetSheet);
+  }
+  inspectedId = waybills[0] ? waybills[0].id : null;
+  selectedRowIds.clear();
+  renderAll();
+  showApiToast("InternetDocument.getDocumentList", rows.length ? ("Из кабинета загружено накладных: " + rows.length) : "В кабинете нет накладных за 30 дней", rows.length ? "ok" : "bad");
+  if (rows.length) trackWaybills(rows);
+}
+async function deleteDocuments(list) {
+  const targets = list.filter((w) => w && w.statusCategory === "new");
+  if (!targets.length) {
+    showApiToast("InternetDocument.delete", "Можно удалять только новые, ещё не принятые ЭН", "bad");
+    return;
+  }
+  const pack = needKey("InternetDocument.delete");
+  if (!pack) return;
+  const real = targets.filter((w) => w.ref);
+  if (!real.length) {
+    showApiToast("InternetDocument.delete", "Это демо-строки без Ref. В кабинет Новой Почты они не записаны.", "bad");
+    return;
+  }
+  let ok = 0;
+  for (const wb of real) {
+    const r = await npCall("InternetDocument", "delete", { DocumentRefs: wb.ref }, pack.key, pack.timeout);
+    if (r && r.success) {
+      waybills = waybills.filter((w) => w.id !== wb.id);
+      selectedRowIds.delete(wb.id);
+      ok += 1;
+    } else {
+      showApiToast("InternetDocument.delete", npErrorText(r), "bad");
+    }
+  }
+  if (waybills.length && !waybills.some((w) => w.id === inspectedId)) inspectedId = waybills[0].id;
+  renderAll();
+  if (ok) showApiToast("InternetDocument.delete", "Удалено в кабинете Новой Почты: " + ok);
+}
+async function attachToScanSheet(list, sheet) {
+  const pack = needKey("ScanSheet.insertDocuments");
+  if (!pack) return;
+  const refs = list.map((w) => w.ref).filter(Boolean);
+  if (!refs.length) {
+    showApiToast("ScanSheet.insertDocuments", "Нет Ref документов. Демо-накладные в реестр Новой Почты не попадают.", "bad");
+    return;
+  }
+  const props = { DocumentRefs: refs };
+  if (sheet && sheet.ref) props.Ref = sheet.ref;
+  const r = await npCall("ScanSheet", "insertDocuments", props, pack.key, pack.timeout);
+  if (!r || !r.success || !r.data || !r.data[0]) {
+    showApiToast("ScanSheet.insertDocuments", npErrorText(r), "bad");
+    return;
+  }
+  const created = r.data[0];
+  const id = created.Ref || (sheet && sheet.ref) || ("sheet-" + Date.now());
+  let known = scanSheets.find((s) => s.ref === id || s.id === id);
+  if (!known) {
+    known = {
+      id,
+      ref: created.Ref || "",
+      number: created.Number ? ("Реестр " + created.Number) : "Реестр",
+      date: created.DateTime || "Только что",
+      status: "open",
+      docCount: refs.length
+    };
+    scanSheets.unshift(known);
+  }
+  list.forEach((w) => { if (w.ref) w.scanSheetId = known.id; });
+  renderAll();
+  showApiToast("ScanSheet.insertDocuments", "Реестр " + (created.Number || known.number) + " принят Новой Почтой (" + refs.length + " ЭН)");
+}
+async function detachFromScanSheet(wb) {
+  const pack = needDoc(wb, "ScanSheet.removeDocuments");
+  if (!pack) return;
+  const sheet = scanSheets.find((s) => s.id === wb.scanSheetId || s.ref === wb.scanSheetId);
+  if (!sheet || !sheet.ref) {
+    showApiToast("ScanSheet.removeDocuments", "У реестра нет Ref Новой Почты", "bad");
+    return;
+  }
+  const r = await npCall("ScanSheet", "removeDocuments", { Ref: sheet.ref, DocumentRefs: [wb.ref] }, pack.key, pack.timeout);
+  if (!r || !r.success) {
+    showApiToast("ScanSheet.removeDocuments", npErrorText(r), "bad");
+    return;
+  }
+  wb.scanSheetId = null;
+  renderAll();
+  showApiToast("ScanSheet.removeDocuments", "ТТН " + wb.ttn + " исключена из реестра");
+}
+async function submitRedirect(wb, newPt) {
+  const pack = needDoc(wb, "AdditionalServiceGeneral.save");
+  if (!pack) return;
+  const digits = String(wb.ttn).replace(/\D/g, "");
+  const check = await npCall("AdditionalServiceGeneral", "checkPossibilityForRedirecting", { Number: digits }, pack.key, pack.timeout);
+  if (!check || !check.success) {
+    showApiToast("AdditionalServiceGeneral.checkPossibilityForRedirecting", npErrorText(check), "bad");
+    return;
+  }
+  const city = await npCall("Address", "searchSettlements", { CityName: npCityQuery(wb.city), Limit: "1" }, "", pack.timeout);
+  const cityRef = city && city.data && city.data[0] && city.data[0].Addresses && city.data[0].Addresses[0] && city.data[0].Addresses[0].DeliveryCity;
+  const wh = await npCall("Address", "getWarehouses", { CityRef: cityRef || "", FindByString: newPt.slice(0, 36), Limit: "10", Page: "1" }, "", pack.timeout);
+  const found = wh && Array.isArray(wh.data) && wh.data[0];
+  if (!found) {
+    showApiToast("Address.getWarehouses", "Отделение для переадресации не найдено", "bad");
+    return;
+  }
+  const saved = await npCall("AdditionalServiceGeneral", "save", {
+    IntDocNumber: digits,
+    OrderType: "orderRedirecting",
+    Customer: "Sender",
+    ServiceType: "WarehouseWarehouse",
+    RecipientWarehouse: found.Ref,
+    RecipientContactName: wb.recipient,
+    RecipientPhone: String(wb.phone || "").replace(/\D/g, ""),
+    PayerType: "Recipient",
+    PaymentMethod: "Cash",
+    Note: newPt
+  }, pack.key, pack.timeout);
+  if (!saved || !saved.success) {
+    showApiToast("AdditionalServiceGeneral.save", npErrorText(saved), "bad");
+    return;
+  }
+  wb.point = found.Description || newPt;
+  wb.timeline = wb.timeline || [];
+  wb.timeline.push({ time: "Только что", place: wb.city, text: "Переадресация принята Новой Почтой: " + (found.Description || newPt), done: true });
+  activeRightActionForm = null;
+  renderAll();
+  showApiToast("AdditionalServiceGeneral.save", "Заявка на переадресацию создана");
+}
+async function submitReturn(wb, reasonText) {
+  const pack = needDoc(wb, "AdditionalService.save");
+  if (!pack) return;
+  const digits = String(wb.ttn).replace(/\D/g, "");
+  const check = await npCall("AdditionalService", "CheckPossibilityCreateReturn", { Number: digits }, pack.key, pack.timeout);
+  if (!check || !check.success) {
+    showApiToast("AdditionalService.CheckPossibilityCreateReturn", npErrorText(check), "bad");
+    return;
+  }
+  const reasons = await npCall("AdditionalService", "getReturnReasons", {}, pack.key, pack.timeout);
+  const reasonRef = reasons && reasons.data && reasons.data[0] && reasons.data[0].Ref;
+  const addr = check.data && check.data[0] && (check.data[0].Ref || check.data[0].ReturnAddressRef || "");
+  const saved = await npCall("AdditionalService", "save", {
+    IntDocNumber: digits,
+    PaymentMethod: "Cash",
+    Reason: reasonRef || "",
+    SubtypeReason: "",
+    Note: reasonText || "",
+    OrderType: "orderCargoReturn",
+    ReturnAddressRef: addr
+  }, pack.key, pack.timeout);
+  if (!saved || !saved.success) {
+    showApiToast("AdditionalService.save", npErrorText(saved), "bad");
+    return;
+  }
+  wb.statusCategory = "returned";
+  wb.statusText = "Оформлен возврат отправителю";
+  wb.storageNote = reasonText || "";
+  wb.timeline = wb.timeline || [];
+  wb.timeline.push({ time: "Только что", place: wb.city, text: "Возврат принят Новой Почтой" + (reasonText ? " (" + reasonText + ")" : ""), done: true });
+  activeRightActionForm = null;
+  renderAll();
+  showApiToast("AdditionalService.save", "Заявка на возврат создана");
+}
+
+/* ========================================================================= */
 /* ОБРАБОТЧИКИ СОБЫТИЙ                                                       */
 /* ========================================================================= */
 document.body.addEventListener("click", (e) => {
@@ -983,29 +1250,15 @@ document.body.addEventListener("click", (e) => {
     } else if (act === "printDocument") {
       printSelected("document");
     } else if (act === "addScanSheet") {
-      const openSs = scanSheets.find(s => s.status === "open") || scanSheets[0];
-      waybills.forEach(w => {
-        if (selectedRowIds.has(w.id)) w.scanSheetId = openSs.id;
-      });
-      showApiToast("ScanSheet.insertDocuments", `${count} ЭН добавлены в ${openSs.number}`);
+      const chosen = waybills.filter((w) => selectedRowIds.has(w.id) && !w.scanSheetId);
+      const openSs = scanSheets.find((s) => s.status === "open" && s.ref) || null;
+      attachToScanSheet(chosen, openSs);
       selectedRowIds.clear();
-      renderAll();
     } else if (act === "refreshTracking") {
       trackWaybills(waybills.filter((w) => selectedRowIds.has(w.id)));
     } else if (act === "deleteDrafts") {
-      const before = waybills.length;
-      waybills = waybills.filter(w => !(selectedRowIds.has(w.id) && w.statusCategory === "new"));
-      const deleted = before - waybills.length;
+      deleteDocuments(waybills.filter((w) => selectedRowIds.has(w.id)));
       selectedRowIds.clear();
-      if (waybills.length && !waybills.some(w => w.id === inspectedId)) {
-        inspectedId = waybills[0].id;
-      }
-      renderAll();
-      showApiToast(
-        "InternetDocument.delete",
-        deleted > 0 ? `Удалено черновиков ЭН: ${deleted}` : "Можно удалять только новые не принятые ЭН",
-        deleted > 0 ? "ok" : "bad"
-      );
     }
     return;
   }
@@ -1024,15 +1277,8 @@ document.body.addEventListener("click", (e) => {
   if (e.target.id === "btn-insp-toggle-scansheet") {
     const wb = waybills.find(w => w.id === inspectedId);
     if (!wb) return;
-    if (wb.scanSheetId) {
-      wb.scanSheetId = null;
-      showApiToast("ScanSheet.removeDocuments", `ТТН ${wb.ttn} исключена из реестра`);
-    } else {
-      const openSs = scanSheets.find(s => s.status === "open") || scanSheets[0];
-      wb.scanSheetId = openSs.id;
-      showApiToast("ScanSheet.insertDocuments", `ТТН ${wb.ttn} добавлена в ${openSs.number}`);
-    }
-    renderAll();
+    if (wb.scanSheetId) detachFromScanSheet(wb);
+    else attachToScanSheet([wb], scanSheets.find(s => s.status === "open" && s.ref) || null);
     return;
   }
   if (e.target.id === "btn-insp-toggle-redirect") {
@@ -1043,13 +1289,7 @@ document.body.addEventListener("click", (e) => {
   if (e.target.id === "btn-submit-redirect") {
     const wb = waybills.find(w => w.id === inspectedId);
     const newPt = document.getElementById("redirect-new-point").value.trim();
-    if (wb && newPt) {
-      wb.point = newPt;
-      wb.timeline.push({ time: "Только что", place: wb.city, text: `Оформлена переадресация на: ${newPt}`, done: true });
-      activeRightActionForm = null;
-      renderAll();
-      showApiToast("AdditionalServiceGeneral.save", "Заявка на переадресацию создана -> success: true");
-    }
+    if (wb && newPt) submitRedirect(wb, newPt);
     return;
   }
   if (e.target.id === "btn-insp-toggle-return") {
@@ -1060,27 +1300,12 @@ document.body.addEventListener("click", (e) => {
   if (e.target.id === "btn-submit-return") {
     const wb = waybills.find(w => w.id === inspectedId);
     const reason = document.getElementById("return-reason-select").value;
-    if (wb) {
-      wb.statusCategory = "returned";
-      wb.statusCode = "10";
-      wb.statusText = "Оформлен возврат отправителю";
-      wb.storageNote = reason;
-      wb.timeline.push({ time: "Только что", place: wb.city, text: `Создан возврат (${reason})`, done: true });
-      activeRightActionForm = null;
-      renderAll();
-      showApiToast("AdditionalService.save", "Заявка на возврат отправлена -> success: true");
-    }
+    if (wb) submitReturn(wb, reason);
     return;
   }
   if (e.target.id === "btn-insp-delete-en") {
     const wb = waybills.find(w => w.id === inspectedId);
-    if (wb && wb.statusCategory === "new") {
-      waybills = waybills.filter(w => w.id !== wb.id);
-      selectedRowIds.delete(wb.id);
-      inspectedId = waybills[0]?.id || null;
-      renderAll();
-      showApiToast("InternetDocument.delete", `Черновик ТТН ${wb.ttn} удалён`);
-    }
+    if (wb) deleteDocuments([wb]);
     return;
   }
 });
@@ -1153,18 +1378,7 @@ document.getElementById("btn-create-scansheet").addEventListener("click", () => 
     showApiToast("ScanSheet.insertDocuments", "Все накладные уже включены в реестры", "bad");
     return;
   }
-  const nextNum = 105 + scanSheets.length - 2;
-  const newSs = {
-    id: `SS-${nextNum}`,
-    number: `Реестр #${nextNum}`,
-    date: "Только что",
-    status: "open",
-    docCount: unbatched.length
-  };
-  scanSheets.unshift(newSs);
-  unbatched.forEach(w => { w.scanSheetId = newSs.id; });
-  renderAll();
-  showApiToast("ScanSheet.insertDocuments", `Создан ${newSs.number} (${unbatched.length} ЭН)`);
+  attachToScanSheet(unbatched, null);
 });
 
 document.getElementById("btn-print-scansheet").addEventListener("click", () => {
@@ -1230,6 +1444,7 @@ function pushWaybill(fields, ttn, ref, warehouseIndex) {
     id: "wb-" + Date.now(),
     ttn,
     ref: ref || "",
+    real: !!ref,
     createdAt: "Только что",
     orderId: fields.orderId,
     recipient: fields.recipient,
@@ -1416,7 +1631,7 @@ function printSelected(kind) {
 }
 npFixNav();
 
-// Инициализация
 renderAll();
+loadCabinet();
 
 }

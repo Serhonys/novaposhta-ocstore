@@ -971,6 +971,13 @@ function renderStep6() {
           </select>
         </div>
 
+        ${catalogResult ? `
+          <div class="rounded-[10px] border ${catalogResult.ok ? "border-[#b7e4c7] bg-[#e8f6ee]" : "border-[#f3c7c7] bg-[#fdecec]"} p-3 space-y-1.5">
+            <div class="font-mono text-[11px] font-bold text-[#111111]">${esc(catalogResult.title)}</div>
+            <pre class="text-[11px] leading-snug font-mono whitespace-pre-wrap break-all max-h-64 overflow-auto text-[#111111]">${esc(catalogResult.text)}</pre>
+          </div>
+        ` : ""}
+
         <div class="divide-y divide-[#e4e5e9]">
           ${filtered.map(m => `
             <div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -981,8 +988,12 @@ function renderStep6() {
                 </div>
                 <p class="text-xs text-[#5c6370]">${esc(m.hint)}</p>
               </div>
-              <span class="self-start sm:self-center shrink-0 font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${m.auth === "key" ? "bg-[#fdecec] text-[#c42323] border-[#f3c7c7]" : "bg-[#e8f6ee] text-[#157a3a] border-[#b7e4c7]"}">
-                ${m.auth === "key" ? "нужен ключ" : "без ключа"}
+              <span class="self-start sm:self-center shrink-0 flex items-center gap-2">
+                <button type="button" data-call-model="${esc(m.model)}" data-call-method="${esc(m.method)}" data-call-auth="${esc(m.auth)}"
+                  class="px-2.5 py-1 rounded-[8px] bg-[#111111] hover:bg-[#27272a] text-white text-[11px] font-bold">Вызвать</button>
+                <span class="font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${m.auth === "key" ? "bg-[#fdecec] text-[#c42323] border-[#f3c7c7]" : "bg-[#e8f6ee] text-[#157a3a] border-[#b7e4c7]"}">
+                  ${m.auth === "key" ? "нужен ключ" : "без ключа"}
+                </span>
               </span>
             </div>
           `).join("")}
@@ -1141,18 +1152,18 @@ function renderInspector() {
     postAlert.classList.add("hidden");
   }
 
-  // Точка выдачи
+  // Точка выдачи — живой справочник, не зашитые адреса
   const pointLabel = document.getElementById("sim-point-label");
   const pointSelect = document.getElementById("sim-point-select");
-  if (selectedCheckoutMethod.endsWith("Doors")) {
+  const cityNow = (document.getElementById("sim-city") && document.getElementById("sim-city").value) || "";
+  const doors = selectedCheckoutMethod.endsWith("Doors");
+  const cached = livePointCache.city === cityNow && livePointCache.mode === (doors ? "doors" : "point") && livePointCache.html;
+  if (doors) {
     pointLabel.textContent = "Адрес курьерской доставки";
-    pointSelect.innerHTML = `<option>вул. Коперника, 15, кв. 42 (Курьер НП)</option>`;
-  } else if (postomatOverLimit || !state.warehouseKinds.postomat) {
-    pointLabel.textContent = "Отделение Новой Почты";
-    pointSelect.innerHTML = `<option>Відділення №12: вул. Городоцька, 174</option><option>Грузове №1 (до 1000 кг)</option>`;
+    pointSelect.innerHTML = cached || `<option value="">Загрузка улиц Новой Почты…</option>`;
   } else {
-    pointLabel.textContent = "Отделение или почтомат";
-    pointSelect.innerHTML = `<option>Відділення №12: вул. Городоцька, 174</option><option>Поштомат №3412: ТРЦ Forum Lviv</option>`;
+    pointLabel.textContent = state.warehouseKinds.postomat && !postomatOverLimit ? "Отделение или почтомат" : "Отделение Новой Почты";
+    pointSelect.innerHTML = cached || `<option value="">Загрузка отделений Новой Почты…</option>`;
   }
 
   // Прогресс-бар бесплатной доставки
@@ -1289,6 +1300,11 @@ document.body.addEventListener("click", (e) => {
     renderAll();
     return;
   }
+
+  const callBtn = e.target.closest("[data-call-method]");
+  if (callBtn) {
+    runCatalogMethod(callBtn.dataset.callModel, callBtn.dataset.callMethod, callBtn.dataset.callAuth);
+  }
 });
 
 document.body.addEventListener("input", (e) => {
@@ -1397,6 +1413,51 @@ document.getElementById("btn-reset").addEventListener("click", () => {
 
 
 const cityRefCache = {};
+const livePointCache = { city: "", mode: "", html: "" };
+let catalogResult = null;
+const WRITE_METHOD = /^(save|update|delete|insert|remove|generate)/i;
+function catalogProps(method) {
+  const today = new Date();
+  const from = new Date(today.getTime() - 30 * 86400000);
+  const fmt = (d) => String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear();
+  if (method === "getDocumentList" || method === "getScanSheetList" || method === "getReturnOrdersList" || method === "getRedirectionOrdersList" || method === "getChangeEWOrdersList") {
+    return { DateTimeFrom: fmt(from), DateTimeTo: fmt(today), Page: "1", Limit: "20", GetFullList: "0" };
+  }
+  if (method === "getDocumentPrice") {
+    return {
+      CitySender: cityRefCache["Київ"] || "8d5a980d-391c-11dd-90d9-001a92567626",
+      CityRecipient: cityRefCache["Львів"] || "db5c88e0-391c-11dd-90d9-001a92567626",
+      Weight: "1",
+      ServiceType: "WarehouseWarehouse",
+      Cost: "500",
+      CargoType: "Parcel",
+      SeatsAmount: "1"
+    };
+  }
+  if (method === "getStatusDocuments") return { Documents: [{ DocumentNumber: "20450000000000", Phone: "" }] };
+  return syncProps(method);
+}
+async function runCatalogMethod(model, method, auth) {
+  if (WRITE_METHOD.test(method)) {
+    notify(model + "." + method + " меняет документы. Его вызывает диспетчер с реальным Ref, из каталога он не запускается.", "bad");
+    return;
+  }
+  const key = state.connection.apiKey.trim();
+  if (auth === "key" && key.length < 32) {
+    notify("Для " + model + "." + method + " нужен API-ключ на шаге 1", "bad");
+    return;
+  }
+  notify(model + "." + method + "…");
+  const r = await npCall(model, method, catalogProps(method), auth === "key" ? key : "", state.connection.timeoutSec);
+  const raw = JSON.stringify(r, null, 2);
+  catalogResult = {
+    ok: !!(r && r.success),
+    title: model + "." + method + (r && r.success ? " → success" : " → ошибка"),
+    text: raw.length > 5000 ? raw.slice(0, 5000) + "\n…" : raw
+  };
+  renderAll();
+  notify(r && r.success ? (model + "." + method + " ответила API") : npErrorText(r), r && r.success ? "ok" : "bad");
+}
 function syncProps(method) {
   if (method === "searchSettlements") return { CityName: "Київ", Limit: "5" };
   if (method === "searchSettlementStreets") return { StreetName: "Хрещатик", Limit: "5", SettlementRef: cityRefCache.kyivSettlement || "e718a680-4b33-11e4-ab6d-005056801329" };
@@ -1450,12 +1511,26 @@ async function refreshCheckoutLive(token) {
   const cartSum = Number(document.getElementById("sim-cart-range") && document.getElementById("sim-cart-range").value) || 0;
   const simWeight = Number(document.getElementById("sim-weight-range") && document.getElementById("sim-weight-range").value) || 0;
   const cityName = npCityQuery(cityLabel);
-  if (!selectedCheckoutMethod.endsWith("Doors") && cityName) {
-    const r = await npCall("Address", "getWarehouses", { CityName: cityName, Limit: "50", Page: "1" }, "", state.connection.timeoutSec);
-    if (token !== liveToken) return;
-    const sel = document.getElementById("sim-point-select");
-    const rows = r && r.success && Array.isArray(r.data) ? r.data : [];
-    if (sel && rows.length) {
+  if (cityName) {
+    let html = "";
+    let mode = "point";
+    if (selectedCheckoutMethod.endsWith("Doors")) {
+      mode = "doors";
+      const city = await npCall("Address", "searchSettlements", { CityName: cityName, Limit: "1" }, "", state.connection.timeoutSec);
+      if (token !== liveToken) return;
+      const settlement = city && city.data && city.data[0] && city.data[0].Addresses && city.data[0].Addresses[0];
+      const streets = settlement
+        ? await npCall("Address", "searchSettlementStreets", { SettlementRef: settlement.Ref, StreetName: "а", Limit: "15" }, "", state.connection.timeoutSec)
+        : null;
+      if (token !== liveToken) return;
+      const rows = streets && streets.data && streets.data[0] && Array.isArray(streets.data[0].Addresses) ? streets.data[0].Addresses : [];
+      html = rows.length
+        ? rows.map((s) => '<option value="' + esc(s.SettlementStreetRef || "") + '">' + esc(s.Present || s.SettlementStreetDescription || "") + "</option>").join("")
+        : '<option value="">' + esc(npErrorText(streets || city)) + "</option>";
+    } else {
+      const r = await npCall("Address", "getWarehouses", { CityName: cityName, Limit: "50", Page: "1" }, "", state.connection.timeoutSec);
+      if (token !== liveToken) return;
+      const rows = r && r.success && Array.isArray(r.data) ? r.data : [];
       const dims = [Number(state.waybill.length), Number(state.waybill.width), Number(state.waybill.height)].sort((a, b) => a - b);
       const postomatOver = simWeight > 20 || dims[0] > 30 || dims[1] > 40 || dims[2] > 60;
       const items = rows.filter((w) => {
@@ -1464,17 +1539,24 @@ async function refreshCheckoutLive(token) {
         const kind = (cat === "Postomat" || /поштомат/i.test(desc)) ? "postomat"
           : (cat === "Cargo" || /вантаж/i.test(desc)) ? "cargo"
           : (cat === "Store" || cat === "DropOff" || /пункт/i.test(desc)) ? "store" : "branch";
-        if (!state.warehouseKinds[kind]) return false;
+        if (state.warehouseKinds && state.warehouseKinds[kind] === false) return false;
         if (kind === "postomat" && postomatOver) return false;
         const maxW = Number(w.TotalMaxWeightAllowed || w.PlaceMaxWeightAllowed || 0);
         if (maxW && simWeight > maxW) return false;
         return true;
       }).slice(0, 40);
-      if (items.length) {
-        const prev = sel.value;
-        sel.innerHTML = items.map((w) => '<option value="' + esc(w.Ref) + '">' + esc(w.Description) + "</option>").join("");
-        if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
-      }
+      html = items.length
+        ? items.map((w) => '<option value="' + esc(w.Ref) + '">' + esc(w.Description) + "</option>").join("")
+        : '<option value="">' + esc(rows.length ? "Нет точек под выбранные фильтры" : npErrorText(r)) + "</option>";
+    }
+    livePointCache.city = cityLabel;
+    livePointCache.mode = mode;
+    livePointCache.html = html;
+    const sel = document.getElementById("sim-point-select");
+    if (sel && token === liveToken) {
+      const prev = sel.value;
+      sel.innerHTML = html;
+      if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
     }
   }
   const cfg = state.methods[selectedCheckoutMethod];

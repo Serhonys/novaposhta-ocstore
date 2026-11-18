@@ -1,14 +1,14 @@
 # Нова пошта для ocStore / OpenCart 3
 
-Модуль доставки Нова Пошта. Поточна версія: **2.0.0**.
+Модуль доставки Нова Пошта. Поточна версія: **2.0.1**.
 
 ## Скачать
 
 Прямая ссылка на архив установщика:
 
-https://github.com/Serhonys/novaposhta-ocstore/releases/download/v2.0.0/novaposhta-2.0.0.ocmod.zip
+https://github.com/Serhonys/novaposhta-ocstore/releases/download/v2.0.1/novaposhta-2.0.1.ocmod.zip
 
-Файл: `novaposhta-2.0.0.ocmod.zip`
+Файл: `novaposhta-2.0.1.ocmod.zip`
 
 Предыдущая версия (1.6.5):
 
