@@ -1,0 +1,363 @@
+{{ header }}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="view/javascript/novaposhta/module.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['JetBrains Mono','ui-monospace','monospace'] } } } };
+</script>
+<style>
+#header, #column-left, #footer { display: none !important; }
+#content { margin: 0 !important; padding: 0 !important; min-height: 100vh !important; }
+body { background: #f3f4f6; }
+</style>
+<div id="np-app" class="font-sans text-[14px] leading-[1.45] antialiased min-h-screen bg-[#f3f4f6] text-[#111111]">
+<!-- Всплывающие API-уведомления (Toasts) -->
+<div id="toast-container" class="fixed top-16 right-4 z-50 flex flex-col gap-2 pointer-events-none max-w-sm"></div>
+
+<!-- ======================================================================= -->
+<!-- 1. ВЕРХНЯЯ ПАНЕЛЬ (HEADER 56px)                                         -->
+<!-- ======================================================================= -->
+<header class="sticky top-0 z-40 h-[56px] w-full bg-white border-b border-[#e4e5e9] px-4 flex items-center justify-between gap-3">
+  <!-- Бренд -->
+  <div class="flex items-center gap-2.5 shrink-0">
+    <div class="w-8 h-8 rounded-[8px] bg-[#111111] text-white font-extrabold text-xs tracking-tighter flex items-center justify-center relative">
+      НП
+      <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#c42323] border-2 border-white"></span>
+    </div>
+    <div class="leading-tight">
+      <div class="font-extrabold text-[14px] tracking-tight text-[#111111]">НП Диспетчер <span class="text-[#5c6370] font-medium">• Экспресс-накладные</span></div>
+      <div class="text-[10px] font-mono text-[#5c6370] hidden sm:block">InternetDocument • ScanSheet • TrackingDocument</div>
+    </div>
+  </div>
+
+  <!-- Быстрый поиск по ТТН, ФИО, телефону, № заказа -->
+  <div class="flex-1 max-w-xl relative">
+    <svg class="w-4 h-4 text-[#5c6370] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
+    </svg>
+    <input type="text" id="global-search" placeholder="Поиск по ТТН (20 450...), ФИО, телефону или № заказа..."
+      class="w-full h-9 pl-9 pr-8 rounded-[10px] border border-[#e4e5e9] bg-[#f6f6f7] focus:bg-white focus:border-[#111111] focus:outline-none text-xs font-medium text-[#111111] transition-colors">
+    <button type="button" id="clear-search-btn" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#5c6370] hover:text-[#111111]">✕</button>
+  </div>
+
+  <!-- Кнопки действий в шапке -->
+  <div class="flex items-center gap-2 shrink-0">
+    <a data-np-nav="/" href="/" class="h-9 px-3 rounded-[10px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs font-bold text-[#111111] flex items-center transition-colors">Настройки</a>
+    <button type="button" id="btn-sync-statuses" class="h-9 px-3 rounded-[10px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs font-bold text-[#111111] flex items-center gap-1.5 transition-colors">
+      <svg id="sync-icon" class="w-3.5 h-3.5 text-[#157a3a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+        <path d="M3 3v5h5"></path>
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+        <path d="M16 16h5v5"></path>
+      </svg>
+      <span class="hidden md:inline">Обновить статусы</span>
+      <code class="hidden xl:inline font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#f6f6f7] text-[#5c6370]">getStatusDocuments</code>
+    </button>
+
+    <button type="button" id="btn-open-create-modal" class="h-9 px-3.5 rounded-[10px] bg-[#111111] hover:bg-[#27272a] text-white text-xs font-bold flex items-center gap-1.5 transition-colors">
+      <span>+ Создать ЭН</span>
+      <code class="hidden lg:inline font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/15 text-white">save</code>
+    </button>
+  </div>
+</header>
+
+<!-- ======================================================================= -->
+<!-- ОСНОВНАЯ 3-КОЛОНОЧНАЯ РАБОЧАЯ ОБЛАСТЬ (100vw)                           -->
+<!-- ======================================================================= -->
+<div class="w-full min-h-[calc(100vh-56px)] flex flex-col lg:flex-row">
+
+  <!-- ===================================================================== -->
+  <!-- 2. ЛЕВЫЙ СВОРАЧИВАЕМЫЙ ФИЛЬТР-БАР И РЕЕСТРЫ SCANSHEET (250px -> 68px) -->
+  <!-- ===================================================================== -->
+  <aside id="left-sidebar" class="w-full lg:w-[250px] shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-[#e4e5e9] lg:sticky lg:top-[56px] lg:h-[calc(100vh-56px)] lg:overflow-y-auto overflow-x-hidden p-3.5 flex flex-col justify-between gap-4">
+    <div class="space-y-4">
+      <!-- Шапка левой панели с кнопкой сворачивания/разворачивания -->
+      <div id="sidebar-header-row" class="flex items-center justify-between px-1.5">
+        <span id="sidebar-statuses-heading" class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#5c6370] whitespace-nowrap">Статусы отправлений</span>
+        <button type="button" id="btn-toggle-sidebar" title="Свернуть левую панель"
+          class="hidden lg:inline-flex items-center justify-center w-7 h-7 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-[#f6f6f7] hover:bg-white text-[#111111] transition-colors shrink-0">
+          <svg id="sidebar-toggle-icon" class="w-3.5 h-3.5 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Фильтры по статусам трекинга -->
+      <div>
+        <nav id="status-filters-nav" class="flex lg:flex-col gap-1.5 overflow-x-auto pb-1 lg:pb-0"></nav>
+      </div>
+
+      <!-- Блок Реестры отгрузки (ScanSheet) -->
+      <div id="sidebar-scansheet-section" class="pt-3 border-t border-[#e4e5e9] space-y-2.5">
+        <!-- Развернутый вид блока реестров -->
+        <div id="scansheet-expanded-view" class="space-y-2.5">
+          <div class="px-1 flex items-center justify-between">
+            <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#5c6370]">Реестры (ScanSheet)</span>
+            <span id="scansheet-count-badge" class="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f6f6f7] border border-[#e4e5e9] text-[#111111]">2</span>
+          </div>
+
+          <div id="scansheet-list" class="space-y-2"></div>
+
+          <div class="space-y-1.5 pt-1">
+            <button type="button" id="btn-create-scansheet" class="w-full py-2 px-2.5 rounded-[10px] bg-[#111111] hover:bg-[#27272a] text-white text-xs font-bold transition-colors text-center">
+              Сформировать реестр из новых
+            </button>
+            <button type="button" id="btn-print-scansheet" class="w-full py-2 px-2.5 rounded-[10px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-[#111111] text-xs font-bold transition-colors flex items-center justify-center gap-1.5">
+              <span>Печать акта</span>
+              <code class="font-mono text-[10px] text-[#5c6370]">printScanSheet</code>
+            </button>
+          </div>
+        </div>
+
+        <!-- Свернутый компактный вид блока реестров (только иконка + бейдж + кнопка) -->
+        <div id="scansheet-collapsed-view" class="hidden flex-col items-center gap-2">
+          <button type="button" id="btn-collapsed-scansheet-info" title="Открыть реестры ScanSheet"
+            class="relative w-10 h-10 rounded-[10px] border border-[#e4e5e9] hover:border-[#111111] bg-[#f6f6f7] hover:bg-white text-[#111111] flex items-center justify-center transition-colors">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              <path d="M9 12h6"></path>
+              <path d="M9 16h6"></path>
+            </svg>
+            <span id="scansheet-collapsed-badge" class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#157a3a] text-white font-mono text-[10px] font-extrabold flex items-center justify-center border-2 border-white">2</span>
+          </button>
+
+          <button type="button" id="btn-collapsed-create-scansheet" title="Сформировать реестр из новых ЭН (ScanSheet.insertDocuments)"
+            class="w-10 h-10 rounded-[10px] bg-[#111111] hover:bg-[#27272a] text-white flex items-center justify-center transition-colors">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Инфо-индикатор склада -->
+    <div id="sidebar-warehouse-card" class="hidden lg:block p-3 rounded-[10px] bg-[#f6f6f7] border border-[#e4e5e9] space-y-1">
+      <div class="flex items-center justify-between text-[11px] font-bold text-[#111111]">
+        <span>Отправитель по умолч.</span>
+        <span class="w-2 h-2 rounded-full bg-[#157a3a]"></span>
+      </div>
+      <div class="text-[11px] text-[#5c6370] leading-snug">ФОП Коваленко О.В. • м. Київ, Відділення №14</div>
+    </div>
+
+    <!-- Компактная иконка отправителя в свернутом виде -->
+    <div id="sidebar-warehouse-collapsed" class="hidden justify-center">
+      <div title="Отправитель по умолчанию: ФОП Коваленко О.В. • м. Київ, Відділення №14"
+        class="relative w-10 h-10 rounded-[10px] bg-[#f6f6f7] border border-[#e4e5e9] text-[#111111] flex items-center justify-center cursor-help">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#157a3a]"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================================================================== -->
+  <!-- 3. ЦЕНТРАЛЬНАЯ ТАБЛИЦА ЭКСПРЕСС-НАКЛАДНЫХ (FLEX-1)                    -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 min-w-0 p-4 pb-24 flex flex-col gap-3">
+    <!-- Сводная полоса сверху таблицы -->
+    <div class="bg-white border border-[#e4e5e9] rounded-[12px] px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <h1 id="table-heading" class="text-base font-extrabold tracking-tight text-[#111111]">Все экспресс-накладные</h1>
+        <span id="table-total-pill" class="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#f6f6f7] border border-[#e4e5e9] text-[#111111]">0 ЭН</span>
+      </div>
+      <div class="flex items-center gap-3 text-xs text-[#5c6370]">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#157a3a]"></span> В реестре / Оплачено</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#c42323]"></span> Платное хранение / Возврат</span>
+      </div>
+    </div>
+
+    <!-- Таблица отправлений -->
+    <div class="bg-white border border-[#e4e5e9] rounded-[12px] overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[820px]">
+          <thead>
+            <tr class="border-b border-[#e4e5e9] bg-[#f6f6f7] text-[11px] font-mono uppercase tracking-wider text-[#5c6370]">
+              <th class="py-3 pl-4 pr-2 w-10">
+                <input type="checkbox" id="select-all-checkbox" class="w-4 h-4 rounded accent-[#111111] cursor-pointer">
+              </th>
+              <th class="py-3 px-3">ТТН и Дата</th>
+              <th class="py-3 px-3">Заказ</th>
+              <th class="py-3 px-3">Получатель и Точка выдачи</th>
+              <th class="py-3 px-3">Вес / Габариты</th>
+              <th class="py-3 px-3">Финансы</th>
+              <th class="py-3 pl-3 pr-4">Статус трекинга</th>
+            </tr>
+          </thead>
+          <tbody id="waybills-tbody" class="divide-y divide-[#e4e5e9] text-[13px]"></tbody>
+        </table>
+      </div>
+      <div id="empty-table-state" class="hidden p-10 text-center space-y-2">
+        <div class="text-sm font-extrabold text-[#111111]">Накладные не найдены</div>
+        <p class="text-xs text-[#5c6370]">Попробуйте изменить поисковый запрос или выбрать другой фильтр статуса слева.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- 4. ПРАВЫЙ ИНСПЕКТОР ВЫБРАННОЙ ЭН (380px)                              -->
+  <!-- ===================================================================== -->
+  <aside id="right-inspector" class="w-full lg:w-[380px] shrink-0 bg-white border-t lg:border-t-0 lg:border-l border-[#e4e5e9] lg:sticky lg:top-[56px] lg:h-[calc(100vh-56px)] lg:overflow-y-auto p-4 space-y-4">
+    <!-- Заполняется динамически через renderInspector() -->
+  </aside>
+
+</div>
+
+<!-- ======================================================================= -->
+<!-- ВСПЛЫВАЮЩАЯ ПАНЕЛЬ МАССОВЫХ ДЕЙСТВИЙ (BULK ACTION BAR)                  -->
+<!-- ======================================================================= -->
+<div id="bulk-action-bar" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95vw] max-w-4xl bg-[#111111] text-white rounded-[14px] px-4 py-3 shadow-xl border border-white/15 flex flex-wrap items-center justify-between gap-2.5">
+  <div class="flex items-center gap-2.5">
+    <span id="bulk-selected-count" class="font-mono text-xs font-extrabold px-2.5 py-1 rounded-[8px] bg-white text-[#111111]">Выбрано: 0</span>
+    <button type="button" id="btn-clear-selection" class="text-xs text-[#a3a3a3] hover:text-white underline">Снять выделение</button>
+  </div>
+  <div class="flex flex-wrap items-center gap-1.5">
+    <button type="button" data-bulk-action="printMarkings" class="px-3 py-1.5 rounded-[8px] bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-colors">
+      Печать маркировок 100×100
+    </button>
+    <button type="button" data-bulk-action="printDocument" class="px-3 py-1.5 rounded-[8px] bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-colors">
+      Печать бланков А4
+    </button>
+    <button type="button" data-bulk-action="addScanSheet" class="px-3 py-1.5 rounded-[8px] bg-[#157a3a] hover:bg-[#198f44] text-white text-xs font-bold transition-colors">
+      В реестр (ScanSheet)
+    </button>
+    <button type="button" data-bulk-action="refreshTracking" class="px-3 py-1.5 rounded-[8px] bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition-colors">
+      Обновить трекинг
+    </button>
+    <button type="button" data-bulk-action="deleteDrafts" class="px-3 py-1.5 rounded-[8px] bg-[#c42323] hover:bg-[#dc2626] text-white text-xs font-bold transition-colors">
+      Удалить черновики
+    </button>
+  </div>
+</div>
+
+<!-- ======================================================================= -->
+<!-- 5. МОДАЛЬНЫЙ МАСТЕР СОЗДАНИЯ НОВОЙ ЭН (InternetDocument.save)           -->
+<!-- ======================================================================= -->
+<div id="create-modal-backdrop" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+  <div class="bg-white border border-[#e4e5e9] rounded-[14px] w-full max-w-2xl overflow-hidden shadow-2xl my-auto">
+    <!-- Шапка модального окна -->
+    <div class="px-5 py-3.5 border-b border-[#e4e5e9] bg-[#f6f6f7] flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="text-base font-extrabold text-[#111111]">Создать экспресс-накладную (ЭН)</h2>
+          <code class="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-[#111111] text-white">InternetDocument.save</code>
+        </div>
+        <p class="text-xs text-[#5c6370]">Выберите необработанный заказ магазина для автозаполнения или введите данные вручную.</p>
+      </div>
+      <button type="button" id="btn-close-create-modal" class="w-8 h-8 rounded-[8px] border border-[#e4e5e9] bg-white hover:border-[#111111] text-sm font-bold text-[#111111]">✕</button>
+    </div>
+
+    <!-- Быстрый выбор готового заказа магазина -->
+    <div class="px-5 pt-4 pb-3 border-b border-[#e4e5e9] space-y-2">
+      <div class="text-[11px] font-mono font-bold uppercase tracking-wider text-[#5c6370]">Необработанные заказы магазина (клик для автозаполнения):</div>
+      <div id="preset-orders-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-2"></div>
+    </div>
+
+    <!-- Форма параметров ЭН -->
+    <form id="create-en-form" class="p-5 space-y-3.5 max-h-[68vh] overflow-y-auto">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">№ Заказа магазина</span>
+          <input type="text" id="new-order-id" value="#10492" required class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] focus:border-[#111111] focus:outline-none font-mono text-xs font-bold">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">ФИО Получателя</span>
+          <input type="text" id="new-recipient" value="Бондаренко Тарас Олегович" required class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] focus:border-[#111111] focus:outline-none text-xs font-semibold">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">Телефон (380...)</span>
+          <input type="text" id="new-phone" value="380974412088" required class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] focus:border-[#111111] focus:outline-none font-mono text-xs font-semibold">
+        </label>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">Технология (ServiceType)</span>
+          <select id="new-service-type" class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] bg-white text-xs font-bold">
+            <option value="WarehouseWarehouse">Отделение / Почтомат (WarehouseWarehouse)</option>
+            <option value="WarehouseDoors">Курьером на адрес (WarehouseDoors)</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">Город получателя</span>
+          <input type="text" id="new-city" value="м. Львів" required class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] focus:border-[#111111] focus:outline-none text-xs font-semibold">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">Отделение / Почтомат / Адрес</span>
+          <input type="text" id="new-point" value="Відділення №12 (вул. Городоцька, 174)" required class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] focus:border-[#111111] focus:outline-none text-xs font-semibold">
+        </label>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 rounded-[10px] bg-[#f6f6f7] border border-[#e4e5e9]">
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] font-bold text-[#111111]">Вес факт, кг</span>
+          <input type="number" step="0.1" id="new-weight" value="1.5" required class="px-2.5 py-1.5 rounded-[8px] border border-[#d5d7dd] bg-white font-mono text-xs font-bold">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] font-bold text-[#111111]">Длина, см</span>
+          <input type="number" id="new-length" value="30" required class="px-2.5 py-1.5 rounded-[8px] border border-[#d5d7dd] bg-white font-mono text-xs font-bold">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] font-bold text-[#111111]">Ширина, см</span>
+          <input type="number" id="new-width" value="20" required class="px-2.5 py-1.5 rounded-[8px] border border-[#d5d7dd] bg-white font-mono text-xs font-bold">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-[11px] font-bold text-[#111111]">Высота, см</span>
+          <input type="number" id="new-height" value="15" required class="px-2.5 py-1.5 rounded-[8px] border border-[#d5d7dd] bg-white font-mono text-xs font-bold">
+        </label>
+        <div class="col-span-2 sm:col-span-1 flex flex-col justify-center">
+          <span class="text-[10px] font-mono uppercase text-[#5c6370]">Объёмный вес</span>
+          <span id="new-vol-weight" class="font-mono text-sm font-extrabold text-[#111111]">2.25 кг</span>
+          <span id="new-postomat-fit" class="text-[10px] font-bold text-[#157a3a]">Влезает в почтомат</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">Оценочная стоимость (Cost), ₴</span>
+          <input type="number" id="new-cost" value="2450" required class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] focus:border-[#111111] focus:outline-none font-mono text-xs font-bold">
+        </label>
+
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold text-[#111111]">Плательщик доставки</span>
+          <select id="new-payer" class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] bg-white text-xs font-bold">
+            <option value="Recipient">Получатель (Recipient)</option>
+            <option value="Sender">Отправитель / Магазин (Sender)</option>
+          </select>
+        </label>
+
+        <!-- Скругленный pill-переключатель наложенного платежа -->
+        <label class="flex items-center justify-between gap-2 p-2.5 rounded-[10px] border border-[#e4e5e9] bg-[#f6f6f7] cursor-pointer select-none mt-4 sm:mt-0">
+          <div>
+            <div class="text-xs font-extrabold text-[#111111]">Наложенный платёж</div>
+            <div class="text-[10px] text-[#5c6370]">BackwardDelivery (Money)</div>
+          </div>
+          <span class="pill-switch tone-green">
+            <input type="checkbox" id="new-cod" checked>
+            <span class="pill-knob"></span>
+          </span>
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold text-[#111111]">Описание груза (Description, до 120 симв.)</span>
+        <input type="text" id="new-description" value="Одяг та аксесуари (Замовлення #10492)" required class="px-3 py-2 rounded-[8px] border border-[#d5d7dd] focus:border-[#111111] focus:outline-none text-xs font-medium">
+      </label>
+
+      <div class="pt-3 border-t border-[#e4e5e9] flex items-center justify-end gap-2">
+        <button type="button" id="btn-cancel-create-modal" class="px-4 py-2 rounded-[10px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs font-bold text-[#111111]">Отмена</button>
+        <button type="submit" class="px-5 py-2 rounded-[10px] bg-[#111111] hover:bg-[#27272a] text-white text-xs font-bold transition-colors">
+          Создать и присвоить ТТН
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+<script>window.NP_BOOT = {{ boot|raw }};</script>
+<script src="view/javascript/novaposhta/dispatch.app.js?v=1"></script>
+{{ footer }}

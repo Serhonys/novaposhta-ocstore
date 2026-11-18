@@ -1,0 +1,30 @@
+<style>
+#np-checkout { margin-top: 12px; font-family: Inter, system-ui, sans-serif; color: #111; }
+#np-checkout .np-card { border: 1px solid #e4e5e9; border-radius: 10px; background: #fff; padding: 14px; }
+#np-checkout .np-title { font-size: 12px; font-weight: 800; }
+#np-checkout .np-field, #np-checkout .np-select { width: 100%; margin-top: 8px; padding: 8px 10px; border: 1px solid #d5d7dd; border-radius: 8px; font-size: 12px; font-weight: 600; background: #fff; }
+#np-checkout .np-suggest { border: 1px solid #e4e5e9; border-radius: 8px; margin-top: 4px; background: #fff; max-height: 180px; overflow: auto; }
+#np-checkout .np-suggest button { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; background: #fff; font-size: 12px; font-weight: 600; }
+#np-checkout .np-suggest button:hover { background: #f6f6f7; }
+#np-checkout .np-free { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #e8f6ee; border: 1px solid #b7e4c7; color: #157a3a; font-size: 11px; font-weight: 700; }
+#np-checkout .np-bar { height: 6px; background: #fff; border-radius: 999px; margin-top: 6px; overflow: hidden; }
+#np-checkout .np-bar > span { display: block; height: 100%; background: #157a3a; }
+#np-checkout .np-alert { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #fdecec; border: 1px solid #f3c7c7; color: #c42323; font-size: 11px; font-weight: 600; }
+#np-checkout .np-note { margin-top: 8px; font-size: 11px; color: #5c6370; }
+</style>
+<div id="np-checkout" data-np="{{ np_json }}">
+  <div class="np-card">
+    <div class="np-title">Доставка Новой Почтой</div>
+    <input type="text" class="np-field" id="np-city" placeholder="Город получателя" autocomplete="off">
+    <div class="np-suggest" id="np-city-list" hidden></div>
+    <div class="np-suggest" id="np-street-list" hidden></div>
+    <input type="text" class="np-field" id="np-street" placeholder="Улица, дом, квартира" hidden autocomplete="off">
+    <select class="np-select" id="np-point"></select>
+    <div class="np-alert" id="np-postomat" hidden></div>
+    <div class="np-free" id="np-free" hidden>
+      <div id="np-free-msg"></div>
+      <div class="np-bar"><span id="np-free-bar"></span></div>
+    </div>
+    <div class="np-note" id="np-cod"></div>
+  </div>
+</div>

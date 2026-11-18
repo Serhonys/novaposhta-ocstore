@@ -1,736 +1,289 @@
-{{ header }}{{ column_left }}
-<div id="content" class="np-admin">
-  <div class="page-header">
-    <div class="container-fluid">
-      <div class="pull-right np-actions">
-        <button type="submit" form="form-shipping" class="btn btn-primary"><i class="fa fa-save"></i> {{ button_save }}</button>
-        <a href="{{ cn_link }}" class="btn btn-default"><i class="fa fa-file-text-o"></i> {{ menu_cn }}</a>
-        <a href="{{ cancel }}" class="btn btn-default"><i class="fa fa-reply"></i></a>
-      </div>
-      <h1>{{ heading_title }}</h1>
-      <ul class="breadcrumb">
-        {% for breadcrumb in breadcrumbs %}
-        <li><a href="{{ breadcrumb.href }}">{{ breadcrumb.text }}</a></li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
-  <div class="container-fluid">
-    {% if error_warning %}
-    <div class="alert alert-danger"><i class="fa fa-exclamation-circle"></i> {{ error_warning }}</div>
-    {% endif %}
-    {% if success %}
-    <div class="alert alert-success"><i class="fa fa-check-circle"></i> {{ success }}</div>
-    {% endif %}
-    {% if counts.warehouses == 0 and counts.lockers == 0 %}
-    <div class="alert alert-warning"><i class="fa fa-database"></i> {{ text_sync_needed }}</div>
-    {% endif %}
+{{ header }}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="view/javascript/novaposhta/module.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['JetBrains Mono','ui-monospace','monospace'] } } } };
+</script>
+<style>
+#header, #column-left, #footer { display: none !important; }
+#content { margin: 0 !important; padding: 0 !important; min-height: 100vh !important; }
+body { background: #f3f4f6; }
+</style>
+<div id="np-app" class="font-sans text-[14px] leading-[1.45] antialiased min-h-screen bg-[#f3f4f6] text-[#111111]">
+<!-- Всплывающие уведомления -->
+<div id="toast-box" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <form action="{{ action }}" method="post" enctype="multipart/form-data" id="form-shipping">
-      <div class="np-shell">
-        <nav class="np-nav">
-          <button type="button" class="is-on" data-pane="general">{{ tab_general }}</button>
-          <button type="button" data-pane="methods">{{ tab_methods }}</button>
-          <button type="button" data-pane="tariff">{{ tab_tariff }}</button>
-          <button type="button" data-pane="sender">{{ tab_sender }}</button>
-          <button type="button" data-pane="sync">{{ tab_sync }}</button>
-          <button type="button" data-pane="track">{{ tab_track }}</button>
-          <button type="button" data-pane="log">{{ tab_log }}</button>
-          <button type="button" data-pane="versions">{{ tab_versions }}</button>
-        </nav>
-        <div class="np-main">
-          <section class="np-pane is-on" id="np-general">
-            <button type="button" class="np-help" data-help="general" title="{{ button_help }}">?</button>
-            <div class="np-grid">
-              <label>{{ entry_status }}
-                <select name="shipping_novaposhta_status">
-                  <option value="1" {% if shipping_novaposhta_status %}selected{% endif %}>{{ text_enabled }}</option>
-                  <option value="0" {% if not shipping_novaposhta_status %}selected{% endif %}>{{ text_disabled }}</option>
-                </select>
-              </label>
-              <label>{{ entry_sort_order }}
-                <input type="text" name="shipping_novaposhta_sort_order" value="{{ shipping_novaposhta_sort_order }}" />
-              </label>
-            </div>
-            <label>{{ entry_api_key }}
-              <span class="np-inline">
-                <input type="text" name="shipping_novaposhta_api_key" value="{{ shipping_novaposhta_api_key }}" id="input-api-key" autocomplete="off" />
-                <button type="button" id="button-save-key">{{ button_save_key }}</button>
-                <button type="button" id="button-api-check">{{ button_check }}</button>
-              </span>
-              <small id="api-check-result"></small>
-            </label>
-            <div class="np-grid">
-              <label>{{ entry_country }}
-                <select name="shipping_novaposhta_country_id">
-                  <option value="0">{{ text_all_countries }}</option>
-                  {% for country in countries %}
-                  <option value="{{ country.country_id }}" {% if country.country_id == shipping_novaposhta_country_id %}selected{% endif %}>{{ country.name }}</option>
-                  {% endfor %}
-                </select>
-                <small>{{ help_country }}</small>
-              </label>
-              <label>{{ entry_weight }}
-                <input type="text" name="shipping_novaposhta_default_weight" value="{{ shipping_novaposhta_default_weight }}" />
-                <small>{{ help_weight }}</small>
-              </label>
-            </div>
-            <label>{{ entry_description }}
-              <textarea class="np-grow" name="shipping_novaposhta_cargo_description" rows="3">{{ shipping_novaposhta_cargo_description }}</textarea>
-              <small class="np-tokens">{{ help_description }}</small>
-            </label>
-            <div class="np-grid">
-              <label>{{ entry_payer }}
-                <select name="shipping_novaposhta_payer">
-                  <option value="Recipient" {% if shipping_novaposhta_payer == 'Recipient' %}selected{% endif %}>{{ text_recipient }}</option>
-                  <option value="Sender" {% if shipping_novaposhta_payer == 'Sender' %}selected{% endif %}>{{ text_sender }}</option>
-                </select>
-              </label>
-              <label>{{ entry_payment }}
-                <select name="shipping_novaposhta_payment">
-                  <option value="Cash" {% if shipping_novaposhta_payment == 'Cash' %}selected{% endif %}>Cash</option>
-                  <option value="NonCash" {% if shipping_novaposhta_payment == 'NonCash' %}selected{% endif %}>NonCash</option>
-                </select>
-              </label>
-            </div>
-            <label>{{ entry_cod }}
-              <select name="shipping_novaposhta_cod[]" multiple size="6">
-                {% for payment in payments %}
-                <option value="{{ payment.code }}" {% if payment.code in shipping_novaposhta_cod %}selected{% endif %}>{{ payment.name }}</option>
-                {% endfor %}
-              </select>
-              <small>{{ help_cod }}</small>
-            </label>
-            <label>{{ entry_cod_status }}
-              <select name="shipping_novaposhta_cod_status">
-                <option value="0">{{ text_skip }}</option>
-                {% for status in order_statuses %}
-                <option value="{{ status.order_status_id }}" {% if shipping_novaposhta_cod_status == status.order_status_id %}selected{% endif %}>{{ status.name }}</option>
-                {% endfor %}
-              </select>
-              <small>{{ help_cod_status }}</small>
-            </label>
-            <label>{{ entry_sms }}
-              <input type="text" name="shipping_novaposhta_sms_url" value="{{ shipping_novaposhta_sms_url }}" />
-              <small>{{ help_sms }}</small>
-            </label>
-            <h3>{{ entry_checkout }}</h3>
-            <p class="np-note">{{ help_checkout }}</p>
-            <div class="np-grid">
-              <label>{{ entry_checkout_city }}
-                <input type="text" name="shipping_novaposhta_checkout_city" value="{{ shipping_novaposhta_checkout_city }}" placeholder="shipping_address[city]" />
-              </label>
-              <label>{{ entry_checkout_point }}
-                <input type="text" name="shipping_novaposhta_checkout_point" value="{{ shipping_novaposhta_checkout_point }}" placeholder="shipping_address[address_1]" />
-              </label>
-              <label>{{ entry_checkout_street }}
-                <input type="text" name="shipping_novaposhta_checkout_street" value="{{ shipping_novaposhta_checkout_street }}" />
-              </label>
-              <label>{{ entry_checkout_building }}
-                <input type="text" name="shipping_novaposhta_checkout_building" value="{{ shipping_novaposhta_checkout_building }}" />
-              </label>
-              <label>{{ entry_checkout_flat }}
-                <input type="text" name="shipping_novaposhta_checkout_flat" value="{{ shipping_novaposhta_checkout_flat }}" />
-              </label>
-              <label>{{ entry_lang }}
-                <select name="shipping_novaposhta_lang">
-                  <option value="auto" {% if shipping_novaposhta_lang != 'uk' and shipping_novaposhta_lang != 'ru' %}selected{% endif %}>{{ text_lang_auto }}</option>
-                  <option value="uk" {% if shipping_novaposhta_lang == 'uk' %}selected{% endif %}>{{ text_lang_uk }}</option>
-                  <option value="ru" {% if shipping_novaposhta_lang == 'ru' %}selected{% endif %}>{{ text_lang_ru }}</option>
-                </select>
-              </label>
-            </div>
-          </section>
+<!-- ======================================================================= -->
+<!-- ПОЛНОШИРИННАЯ 3-КОЛОНОЧНАЯ СЕТКА (100vw)                                 -->
+<!-- ======================================================================= -->
+<div class="w-full min-h-screen flex flex-col lg:flex-row">
 
-          <section class="np-pane" id="np-methods">
-            <button type="button" class="np-help" data-help="methods" title="{{ button_help }}">?</button>
-            {% for code in ['department', 'poshtomat', 'doors'] %}
-            {% set method = shipping_novaposhta_method[code]|default({}) %}
-            <article class="np-card">
-              <h3>{{ attribute(_context, 'text_method_' ~ code) }}</h3>
-              <div class="np-grid">
-                <label>{{ entry_status }}
-                  <select name="shipping_novaposhta_method[{{ code }}][status]">
-                    <option value="1" {% if method.status %}selected{% endif %}>{{ text_enabled }}</option>
-                    <option value="0" {% if not method.status %}selected{% endif %}>{{ text_disabled }}</option>
-                  </select>
-                </label>
-                <label>{{ entry_api_calc }}
-                  <select name="shipping_novaposhta_method[{{ code }}][api]">
-                    <option value="1" {% if method.api is not defined or method.api %}selected{% endif %}>{{ text_yes }}</option>
-                    <option value="0" {% if method.api is defined and not method.api %}selected{% endif %}>{{ text_no }}</option>
-                  </select>
-                </label>
-                <label>{{ entry_free_from }}
-                  <input type="text" name="shipping_novaposhta_method[{{ code }}][free_from]" value="{{ method.free_from|default('') }}" />
-                </label>
-                <label>{{ entry_geo_zone }}
-                  <select name="shipping_novaposhta_method[{{ code }}][geo_zone_id]">
-                    <option value="0">{{ text_all_zones }}</option>
-                    {% for geo_zone in geo_zones %}
-                    <option value="{{ geo_zone.geo_zone_id }}" {% if method.geo_zone_id|default(0) == geo_zone.geo_zone_id %}selected{% endif %}>{{ geo_zone.name }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <label>{{ entry_tax }}
-                  <select name="shipping_novaposhta_method[{{ code }}][tax_class_id]">
-                    <option value="0">{{ text_none }}</option>
-                    {% for tax_class in tax_classes %}
-                    <option value="{{ tax_class.tax_class_id }}" {% if method.tax_class_id|default(0) == tax_class.tax_class_id %}selected{% endif %}>{{ tax_class.title }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                {% if code != 'doors' %}
-                <label>{{ entry_filter_weight }}
-                  <select name="shipping_novaposhta_method[{{ code }}][filter_weight]">
-                    <option value="1" {% if method.filter_weight is not defined or method.filter_weight %}selected{% endif %}>{{ text_yes }}</option>
-                    <option value="0" {% if method.filter_weight is defined and not method.filter_weight %}selected{% endif %}>{{ text_no }}</option>
-                  </select>
-                </label>
-                <label>{{ entry_filter_size }}
-                  <select name="shipping_novaposhta_method[{{ code }}][filter_size]">
-                    <option value="1" {% if method.filter_size is not defined or method.filter_size %}selected{% endif %}>{{ text_yes }}</option>
-                    <option value="0" {% if method.filter_size is defined and not method.filter_size %}selected{% endif %}>{{ text_no }}</option>
-                  </select>
-                </label>
-                {% endif %}
-              </div>
-              <small>{{ help_api_calc }}</small>
-            </article>
-            {% endfor %}
-          </section>
-
-          <section class="np-pane" id="np-tariff">
-            <button type="button" class="np-help" data-help="tariff" title="{{ button_help }}">?</button>
-            <p class="np-note">{{ help_tariff }}</p>
-            <div class="np-table-wrap">
-              <table id="tariff-table">
-                <thead>
-                  <tr>
-                    <th>{{ column_weight }}</th>
-                    <th>{{ column_warehouse }}</th>
-                    <th>{{ column_city }}</th>
-                    <th>{{ column_region }}</th>
-                    <th>{{ column_ukraine }}</th>
-                    <th>{{ column_doors }}</th>
-                    <th>{{ column_doors_pickup }}</th>
-                    <th>{{ column_locker }}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for row in shipping_novaposhta_tariff %}
-                  <tr>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][weight]" value="{{ row.weight }}" /></td>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][warehouse]" value="{{ row.warehouse|default(row.city|default('')) }}" /></td>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][city]" value="{{ row.city }}" /></td>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][region]" value="{{ row.region }}" /></td>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][ukraine]" value="{{ row.ukraine }}" /></td>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][doors]" value="{{ row.doors }}" /></td>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][doors_pickup]" value="{{ row.doors_pickup|default(0) }}" /></td>
-                    <td><input name="shipping_novaposhta_tariff[{{ loop.index0 }}][locker]" value="{{ row.locker }}" /></td>
-                    <td><button type="button" class="np-icon" onclick="$(this).closest('tr').remove();"><i class="fa fa-times"></i></button></td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            <button type="button" id="button-tariff-add" class="np-ghost"><i class="fa fa-plus"></i> {{ button_add }}</button>
-          </section>
-
-          <section class="np-pane" id="np-sender">
-            <button type="button" class="np-help" data-help="sender" title="{{ button_help }}">?</button>
-            <label>{{ entry_sender }}
-              <select name="shipping_novaposhta_sender_ref" id="input-sender">
-                <option value="{{ shipping_novaposhta_sender_ref }}">{% if shipping_novaposhta_sender_name %}{{ shipping_novaposhta_sender_name }}{% else %}{{ text_name_after_check }}{% endif %}</option>
-              </select>
-              <input type="hidden" name="shipping_novaposhta_sender_name" id="input-sender-name" value="{{ shipping_novaposhta_sender_name }}" />
-              <small>{{ help_sender }}</small>
-            </label>
-            <div class="np-grid">
-              <label>{{ entry_contact }}
-                <select name="shipping_novaposhta_sender_contact" id="input-contact">
-                  <option value="{{ shipping_novaposhta_sender_contact }}">{% if shipping_novaposhta_sender_contact_name %}{{ shipping_novaposhta_sender_contact_name }}{% else %}{{ text_name_after_check }}{% endif %}</option>
-                </select>
-                <input type="hidden" name="shipping_novaposhta_sender_contact_name" id="input-contact-name" value="{{ shipping_novaposhta_sender_contact_name }}" />
-              </label>
-              <label>{{ entry_phone }}
-                <input type="text" name="shipping_novaposhta_sender_phone" id="input-phone" value="{{ shipping_novaposhta_sender_phone }}" />
-              </label>
-            </div>
-            <label>{{ entry_sender_type }}
-              <select name="shipping_novaposhta_sender_type">
-                <option value="Warehouse" {% if shipping_novaposhta_sender_type != 'Doors' %}selected{% endif %}>{{ text_from_warehouse }}</option>
-                <option value="Doors" {% if shipping_novaposhta_sender_type == 'Doors' %}selected{% endif %}>{{ text_from_doors }}</option>
-              </select>
-            </label>
-            <div class="np-grid">
-              <label>{{ entry_sender_city_pick }}
-                <input type="text" id="np-sender-city-q" class="np-field" autocomplete="off" placeholder="{{ text_sender_city_ph }}" />
-              </label>
-              <label>{{ entry_sender_address }}
-                <input type="text" id="np-sender-wh-q" class="np-field" value="{{ shipping_novaposhta_sender_address_name }}" autocomplete="off" placeholder="{{ text_sender_wh_ph }}" />
-              </label>
-            </div>
-            <p class="np-note">{{ help_sender_pick }}</p>
-            <select id="input-address-api" hidden></select>
-            <input type="hidden" name="shipping_novaposhta_sender_address" id="input-address-ref" value="{{ shipping_novaposhta_sender_address }}" />
-            <input type="hidden" name="shipping_novaposhta_sender_address_name" id="input-address-name" value="{{ shipping_novaposhta_sender_address_name }}" />
-            <input type="hidden" name="shipping_novaposhta_sender_city" id="input-sender-city" value="{{ shipping_novaposhta_sender_city }}" />
-            <h3>{{ text_more_senders }}</h3>
-            <p class="np-note">{{ help_senders }}</p>
-            {% for i in 0..2 %}
-            {% set sender = shipping_novaposhta_senders[i]|default({}) %}
-            <div class="np-card">
-              <input type="hidden" name="shipping_novaposhta_senders[{{ i }}][id]" value="{{ i }}" />
-              <div class="np-grid">
-                <label>{{ entry_name }}<input type="text" name="shipping_novaposhta_senders[{{ i }}][name]" value="{{ sender.name|default('') }}" /></label>
-                <label>API<input type="text" name="shipping_novaposhta_senders[{{ i }}][api_key]" value="{{ sender.api_key|default('') }}" autocomplete="off" /></label>
-              </div>
-              <div class="np-grid">
-                <label>Ref<input type="text" name="shipping_novaposhta_senders[{{ i }}][ref]" value="{{ sender.ref|default('') }}" /></label>
-                <label>{{ entry_contact }}
-                  <input type="hidden" name="shipping_novaposhta_senders[{{ i }}][contact]" value="{{ sender.contact|default('') }}" />
-                  <input type="text" name="shipping_novaposhta_senders[{{ i }}][contact_name]" value="{{ sender.contact_name|default('') }}" placeholder="{{ text_name_after_check }}" readonly />
-                </label>
-              </div>
-              <div class="np-grid">
-                <label>{{ entry_phone }}<input type="text" name="shipping_novaposhta_senders[{{ i }}][phone]" value="{{ sender.phone|default('') }}" /></label>
-                <label>City ref<input type="text" name="shipping_novaposhta_senders[{{ i }}][city]" value="{{ sender.city|default('') }}" /></label>
-              </div>
-              <label>{{ entry_sender_address }}<input type="text" name="shipping_novaposhta_senders[{{ i }}][address]" value="{{ sender.address|default('') }}" /></label>
-              <button type="button" class="np-probe" data-index="{{ i }}">{{ button_check }}</button>
-              <label>{{ entry_sender_type }}
-                <select name="shipping_novaposhta_senders[{{ i }}][type]">
-                  <option value="Warehouse" {% if sender.type|default('Warehouse') != 'Doors' %}selected{% endif %}>{{ text_from_warehouse }}</option>
-                  <option value="Doors" {% if sender.type|default('') == 'Doors' %}selected{% endif %}>{{ text_from_doors }}</option>
-                </select>
-              </label>
-            </div>
-            {% endfor %}
-          </section>
-
-          <section class="np-pane" id="np-sync">
-            <button type="button" class="np-help" data-help="sync" title="{{ button_help }}">?</button>
-            <div class="np-stats">
-              <div><b id="np-stat-regions">{{ counts.regions }}</b><span>{{ text_regions }}</span></div>
-              <div><b id="np-stat-cities">{{ counts.cities }}</b><span>{{ text_cities }}</span></div>
-              <div><b id="np-stat-branches">{{ counts.warehouses }}</b><span>{{ text_branches }}</span></div>
-              <div><b id="np-stat-lockers">{{ counts.lockers }}</b><span>{{ text_lockers }}</span></div>
-            </div>
-            <button type="button" id="button-sync" data-label-update="{{ button_sync_update }}">{% if directory_ready %}{{ button_sync_update }}{% else %}{{ button_sync }}{% endif %}</button>
-            <p class="np-note">{{ help_sync }}</p>
-            <pre id="sync-log"></pre>
-          </section>
-
-          <section class="np-pane" id="np-track">
-            <button type="button" class="np-help" data-help="track" title="{{ button_help }}">?</button>
-            <div class="np-grid">
-              <label>{{ entry_cron_key }}
-                <input type="text" name="shipping_novaposhta_cron_key" value="{{ shipping_novaposhta_cron_key }}" />
-                <small>{{ help_cron }}</small>
-              </label>
-              <label>{{ entry_notify }}
-                <select name="shipping_novaposhta_notify">
-                  <option value="1" {% if shipping_novaposhta_notify %}selected{% endif %}>{{ text_yes }}</option>
-                  <option value="0" {% if not shipping_novaposhta_notify %}selected{% endif %}>{{ text_no }}</option>
-                </select>
-              </label>
-            </div>
-            <label>{{ entry_alert }}
-              <input type="text" name="shipping_novaposhta_alert_email" value="{{ shipping_novaposhta_alert_email }}" />
-              <small>{{ help_alert }}</small>
-            </label>
-            <h3>{{ entry_status_map }}</h3>
-            {% for code, label in {'7': text_status_7, '8': text_status_8, '9': text_status_9, '10': text_status_10, '102': text_status_102, '103': text_status_103} %}
-            <div class="np-map">
-              <span>{{ label }} <em>{{ code }}</em></span>
-              <select name="shipping_novaposhta_status_map[{{ code }}]">
-                <option value="0">{{ text_skip }}</option>
-                {% for order_status in order_statuses %}
-                <option value="{{ order_status.order_status_id }}" {% if shipping_novaposhta_status_map[code]|default(0) == order_status.order_status_id %}selected{% endif %}>{{ order_status.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            {% endfor %}
-            <div class="np-code">
-              <code>{{ cron_track }}</code>
-              <code>{{ cron_queue }}</code>
-              <code>{{ cron_sync }}</code>
-              <small>{{ help_cron_url }}</small>
-            </div>
-          </section>
-
-          <section class="np-pane" id="np-log">
-            <button type="button" class="np-help" data-help="log" title="{{ button_help }}">?</button>
-            <table class="np-cn">
-              <thead><tr><th></th><th>Method</th><th></th></tr></thead>
-              <tbody>
-                {% for log in logs %}
-                <tr>
-                  <td>{{ log.created_at }}</td>
-                  <td>{{ log.model }}.{{ log.method }}</td>
-                  <td>{{ log.success ? 'ok' : log.message }}</td>
-                </tr>
-                {% else %}
-                <tr><td colspan="3">{{ text_log_empty }}</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </section>
-
-          <section class="np-pane" id="np-versions">
-            <button type="button" class="np-help" data-help="versions" title="{{ button_help }}">?</button>
-            <ul class="np-versions">
-              {% for row in changelog %}
-              <li class="{% if row.current %}is-current{% endif %}">
-                <b>{{ row.version }}</b>
-                <span>{{ row.text }}</span>
-              </li>
-              {% endfor %}
-            </ul>
-          </section>
+  <!-- ===================================================================== -->
+  <!-- КОЛОНКА 1: ЛЕВАЯ НАВИГАЦИЯ (260px STICKY)                             -->
+  <!-- ===================================================================== -->
+  <aside class="w-full lg:w-[260px] shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-[#e4e5e9] lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto p-4 flex flex-col justify-between gap-4">
+    <div class="space-y-4">
+      <!-- Бренд -->
+      <div class="flex items-center justify-between gap-2 px-1">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-[8px] bg-[#111111] text-white font-extrabold text-sm tracking-tighter flex items-center justify-center relative">
+            НП
+            <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#c42323] border-2 border-white"></span>
+          </div>
+          <div>
+            <div class="font-extrabold text-[15px] tracking-tight text-[#111111] leading-tight">Новая Почта</div>
+            <div class="text-[11px] font-mono text-[#5c6370]">API v2.0 • 66 методов</div>
+          </div>
         </div>
       </div>
-    </form>
-  </div>
+
+      <!-- Индикатор готовности модуля -->
+      <div id="readiness-card" class="p-3 rounded-[10px] border border-[#e4e5e9] bg-[#f6f6f7] space-y-2">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-bold text-[#111111]">Готовность к работе</span>
+          <span id="readiness-badge" class="font-mono text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#fdecec] text-[#c42323]">Нужен ключ</span>
+        </div>
+        <div class="w-full h-1.5 bg-[#e4e5e9] rounded-full overflow-hidden">
+          <div id="readiness-bar" class="h-full bg-[#157a3a] rounded-full transition-all duration-300" style="width: 75%"></div>
+        </div>
+        <div id="readiness-hint" class="text-[11px] text-[#5c6370] leading-snug">
+          Заполните обязательные поля без красных точек
+        </div>
+      </div>
+
+      <!-- 6 логических шагов навигации -->
+      <nav id="main-nav" class="flex lg:flex-col gap-1 overflow-x-auto pb-1 lg:pb-0" aria-label="Разделы настроек"></nav>
+
+      <!-- Быстрое переключение пресетов в сайдбаре -->
+      <div class="hidden lg:block pt-3 border-t border-[#e4e5e9] space-y-2">
+        <div class="px-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#5c6370]">Быстрый пресет</div>
+        <div class="space-y-1.5">
+          <button type="button" data-preset="classic" class="preset-side-btn w-full text-left px-2.5 py-2 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs transition-colors">
+            <div class="font-bold text-[#111111]">Классический E-commerce</div>
+            <div class="text-[11px] text-[#5c6370]">Отделение + постомат + наложка</div>
+          </button>
+          <button type="button" data-preset="prepaid_free" class="preset-side-btn w-full text-left px-2.5 py-2 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs transition-colors">
+            <div class="font-bold text-[#111111]">Предоплата + Бесплатно</div>
+            <div class="text-[11px] text-[#5c6370]">Без наложки, от 2000 ₴ за наш счёт</div>
+          </button>
+          <button type="button" data-preset="b2b_control" class="preset-side-btn w-full text-left px-2.5 py-2 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs transition-colors">
+            <div class="font-bold text-[#111111]">B2B / Контроль оплаты</div>
+            <div class="text-[11px] text-[#5c6370]">Afterpayment на р/с ФЛП/ООО</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Статус API шлюза -->
+    <div class="hidden lg:flex items-center justify-between px-3 py-2 rounded-[8px] border border-[#b7e4c7] bg-[#e8f6ee] text-[11px]">
+      <span class="flex items-center gap-1.5 font-bold text-[#157a3a]">
+        <span class="w-2 h-2 rounded-full bg-[#157a3a]"></span>
+        api.novaposhta.ua/v2.0
+      </span>
+      <span class="font-mono font-bold text-[#157a3a]">JSON</span>
+    </div>
+  </aside>
+
+  <!-- ===================================================================== -->
+  <!-- КОЛОНКА 2: ЦЕНТРАЛЬНАЯ РАБОЧАЯ ОБЛАСТЬ (FLEX-1)                       -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 min-w-0 flex flex-col justify-between pb-20">
+    <div class="p-4 sm:p-6 space-y-5">
+
+      <!-- Верхняя панель пресетов и живых блокеров -->
+      <div class="bg-white border border-[#e4e5e9] rounded-[12px] p-4 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-[#5c6370]">Сценарии быстрого старта (1 клик)</span>
+            <h2 class="text-sm font-extrabold text-[#111111]">Настройте связку доставки и оплаты под модель магазина</h2>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" data-preset="classic" class="preset-top-btn px-3 py-1.5 rounded-[8px] border border-[#111111] bg-[#111111] text-white text-xs font-bold transition-colors">
+              Классический E-commerce
+            </button>
+            <button type="button" data-preset="prepaid_free" class="preset-top-btn px-3 py-1.5 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-[#111111] text-xs font-bold transition-colors">
+              Предоплата + Бесплатно от 2000 ₴
+            </button>
+            <button type="button" data-preset="b2b_control" class="preset-top-btn px-3 py-1.5 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-[#111111] text-xs font-bold transition-colors">
+              B2B / Контроль оплаты
+            </button>
+          </div>
+        </div>
+
+        <!-- Кликабельная полоса блокеров / валидации -->
+        <div id="issues-banner" class="space-y-1.5"></div>
+      </div>
+
+      <!-- Динамический контент активного шага -->
+      <div id="workspace-view" class="space-y-4"></div>
+
+    </div>
+
+    <!-- Фиксированная нижняя панель управления конфигурацией -->
+    <footer class="sticky bottom-0 z-30 bg-white/95 backdrop-blur border-t border-[#e4e5e9] px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2 text-xs text-[#5c6370]">
+        <span class="w-2 h-2 rounded-full bg-[#157a3a]"></span>
+        <span>Автосохранение в браузере активно</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <a data-np-nav="/dispatch" href="/dispatch" class="px-3.5 py-2 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs font-bold text-[#111111] transition-colors">Диспетчер ЭН</a>
+        <button type="button" id="btn-reset" class="px-3.5 py-2 rounded-[8px] border border-[#e4e5e9] hover:border-[#c42323] hover:text-[#c42323] bg-white text-xs font-bold text-[#111111] transition-colors">
+          Сбросить
+        </button>
+        <label class="px-3.5 py-2 rounded-[8px] border border-[#e4e5e9] hover:border-[#111111] bg-white text-xs font-bold text-[#111111] transition-colors cursor-pointer">
+          Импорт JSON
+          <input type="file" id="input-import-json" accept="application/json" class="hidden">
+        </label>
+        <button type="button" id="btn-download-json" class="px-4 py-2 rounded-[8px] bg-[#111111] hover:bg-[#27272a] text-white text-xs font-bold transition-colors">
+          Скачать JSON
+        </button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- КОЛОНКА 3: ПРАВЫЙ ЖИВОЙ ИНСПЕКТОР (370px STICKY)                      -->
+  <!-- ===================================================================== -->
+  <aside class="w-full lg:w-[370px] shrink-0 bg-white border-t lg:border-t-0 lg:border-l border-[#e4e5e9] lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto p-4 flex flex-col gap-3.5">
+
+    <!-- Переключатель вкладок инспектора -->
+    <div class="grid grid-cols-2 p-1 rounded-[10px] bg-[#f3f4f6] border border-[#e4e5e9]">
+      <button type="button" id="tab-preview-btn" class="py-1.5 px-3 rounded-[8px] bg-[#111111] text-white text-xs font-bold transition-colors">
+        Вид на чекауте
+      </button>
+      <button type="button" id="tab-json-btn" class="py-1.5 px-3 rounded-[8px] text-[#5c6370] hover:text-[#111111] text-xs font-bold transition-colors">
+        JSON save
+      </button>
+    </div>
+
+    <!-- ВКЛАДКА 1: ОРИЕНТИРОВОЧНЫЙ ВИД НА ЧЕКАУТЕ -->
+    <div id="inspector-preview-pane" class="space-y-3.5">
+      <!-- Обязательный дисклеймер -->
+      <div class="p-3 rounded-[10px] border border-[#111111] bg-[#f6f6f7] flex items-start gap-2.5">
+        <span class="w-2 h-2 rounded-full bg-[#c42323] mt-1.5 shrink-0"></span>
+        <p class="text-[11px] text-[#5c6370] leading-snug">
+          <strong class="text-[#111111] font-bold">Ориентировочный вид:</strong> итоговое отображение зависит от модуля заказа и темы оформления магазина.
+        </p>
+      </div>
+
+      <!-- Симулятор корзины (сумма 300–5000 ₴ и вес посылки) -->
+      <div class="p-3.5 rounded-[10px] border border-[#e4e5e9] bg-white space-y-3">
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-[#5c6370]">Сумма товаров в корзине:</span>
+            <span id="sim-cart-label" class="font-mono font-extrabold text-sm text-[#111111] bg-[#f6f6f7] px-2 py-0.5 rounded-[6px] border border-[#e4e5e9]">1 850 ₴</span>
+          </div>
+          <input type="range" id="sim-cart-range" min="300" max="5000" step="50" value="1850" class="w-full">
+          <div class="flex justify-between font-mono text-[10px] text-[#5c6370]">
+            <span>300 ₴</span>
+            <span>5 000 ₴</span>
+          </div>
+        </div>
+
+        <div class="pt-2.5 border-t border-[#e4e5e9] space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-[#5c6370]">Тестовый вес посылки:</span>
+            <span id="sim-weight-label" class="font-mono font-extrabold text-xs text-[#111111]">1.5 кг</span>
+          </div>
+          <input type="range" id="sim-weight-range" min="0.5" max="45" step="0.5" value="1.5" class="w-full">
+          <div class="flex justify-between font-mono text-[10px] text-[#5c6370]">
+            <span>0.5 кг</span>
+            <span>20 кг (почтомат)</span>
+            <span>45 кг</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Блок доставки глазами покупателя -->
+      <div class="p-3.5 rounded-[10px] border border-[#e4e5e9] bg-white space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-[#111111]">Доставка Новой Почтой</span>
+          <span id="sim-module-status" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#e8f6ee] text-[#157a3a]">Активен</span>
+        </div>
+
+        <select id="sim-city" class="w-full px-2.5 py-1.5 rounded-[8px] border border-[#d5d7dd] bg-white text-xs font-semibold text-[#111111]">
+          <option>м. Львів (Львівська обл.)</option>
+          <option>м. Київ (Київська обл.)</option>
+          <option>м. Одеса (Одеська обл.)</option>
+        </select>
+
+        <!-- Список активных ServiceTypes -->
+        <div id="sim-services-container" class="space-y-1.5"></div>
+
+        <!-- Предупреждение по габаритам/весу почтомата -->
+        <div id="sim-postomat-alert" class="hidden p-2.5 rounded-[8px] bg-[#fdecec] border border-[#f3c7c7] text-[11px] text-[#c42323] font-medium leading-snug"></div>
+
+        <!-- Выбор отделения/адреса -->
+        <div id="sim-point-box" class="space-y-1">
+          <div id="sim-point-label" class="text-[10px] font-mono uppercase text-[#5c6370]">Точка выдачи</div>
+          <select id="sim-point-select" class="w-full px-2.5 py-1.5 rounded-[8px] border border-[#d5d7dd] bg-[#f6f6f7] text-[11px] font-semibold text-[#111111]"></select>
+        </div>
+
+        <!-- Прогресс-бар бесплатной доставки -->
+        <div id="sim-free-box" class="hidden p-2.5 rounded-[8px] bg-[#e8f6ee] border border-[#b7e4c7] space-y-1">
+          <div class="flex justify-between text-[11px] font-bold text-[#157a3a]">
+            <span id="sim-free-msg">До бесплатной доставки: 150 ₴</span>
+            <span id="sim-free-pct" class="font-mono">92%</span>
+          </div>
+          <div class="w-full h-1.5 bg-white rounded-full overflow-hidden">
+            <div id="sim-free-bar" class="h-full bg-[#157a3a] rounded-full transition-all duration-300" style="width: 92%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Калькулятор выплаты и комиссии наложки -->
+      <div class="p-3.5 rounded-[10px] border border-[#111111] bg-[#f6f6f7] space-y-2">
+        <div class="flex items-center justify-between border-b border-[#e4e5e9] pb-1.5">
+          <span class="text-xs font-extrabold text-[#111111]">Расчет оплаты и комиссии</span>
+          <span id="sim-payout-badge" class="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#e8f6ee] text-[#157a3a]">Маржа ОК</span>
+        </div>
+        <div class="space-y-1 text-xs">
+          <div class="flex justify-between">
+            <span class="text-[#5c6370]">Сумма заказа:</span>
+            <span id="calc-order-total" class="font-mono font-bold text-[#111111]">1 850 ₴</span>
+          </div>
+          <div class="flex justify-between">
+            <span id="calc-ship-who" class="text-[#5c6370]">Доставка (платит клиент):</span>
+            <span id="calc-ship-val" class="font-mono font-semibold text-[#111111]">70 ₴</span>
+          </div>
+          <div id="calc-cod-line" class="flex justify-between">
+            <span id="calc-cod-who" class="text-[#5c6370]">Комиссия наложки (клиент):</span>
+            <span id="calc-cod-val" class="font-mono font-bold text-[#c42323]">57 ₴</span>
+          </div>
+          <div class="pt-1.5 border-t border-[#e4e5e9] flex justify-between items-center">
+            <span class="font-extrabold text-[#111111]">Чистая выплата магазину:</span>
+            <span id="calc-net-payout" class="font-mono text-sm font-extrabold text-[#157a3a]">1 850 ₴</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ВКЛАДКА 2: LIVE JSON PAYLOAD ДЛЯ SAVE -->
+    <div id="inspector-json-pane" class="hidden flex-1 flex flex-col gap-2.5">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xs font-extrabold text-[#111111]">Тело запроса API v2.0</div>
+          <div id="json-model-subtitle" class="font-mono text-[11px] text-[#5c6370]">InternetDocument.save</div>
+        </div>
+        <button type="button" id="btn-copy-json" class="px-3 py-1.5 rounded-[8px] bg-[#111111] hover:bg-[#27272a] text-white text-xs font-bold transition-colors">
+          Скопировать JSON
+        </button>
+      </div>
+      <div class="p-2.5 rounded-[8px] bg-[#f6f6f7] border border-[#e4e5e9] text-[11px] text-[#5c6370]">
+        Обновляется в реальном времени при любом изменении настроек. В фигурных скобках — переменные заказа.
+      </div>
+      <pre id="live-json-output" class="flex-1 m-0 p-3.5 rounded-[10px] bg-[#111111] text-[#f5f5f5] font-mono text-[11px] leading-[1.55] overflow-auto whitespace-pre"></pre>
+    </div>
+
+  </aside>
 </div>
-<div id="np-help" class="np-help-modal" hidden>
-  <div class="np-help-card">
-    <button type="button" class="np-help-x" aria-label="{{ button_help }}">×</button>
-    <h3 id="np-help-title"></h3>
-    <div id="np-help-text"></div>
-  </div>
+
+<!-- ======================================================================= -->
+<!-- ПОЛНАЯ БАЗА 66 МЕТОДОВ API НОВОЙ ПОЧТЫ v2.0 (ИЗ РЕФЕРЕНСА)              -->
+<!-- ======================================================================= -->
+<script id="np-data" type="application/json">{"methods":[{"model":"Address","method":"searchSettlements","title":"Поиск населённого пункта","hint":"Живой поиск на чекауте. Не выгружайте всю Украину в браузер покупателя.","auth":"public","section":"step1"},{"model":"Address","method":"searchSettlementStreets","title":"Поиск улицы","hint":"Для адресной доставки. Нужен SettlementRef из searchSettlements.","auth":"public","section":"step1"},{"model":"Address","method":"getAreas","title":"Области","hint":"Короткий справочник. Обновляйте вместе с городами.","auth":"public","section":"step1"},{"model":"Address","method":"getCities","title":"Города","hint":"Классический справочник городов. Для тарифа и старых форм. Город отправителя берётся отсюда или из searchSettlements.","auth":"public","section":"step1"},{"model":"Address","method":"getSettlements","title":"Населённые пункты","hint":"Полный справочник. Тяжёлый: лучше ночной cron, на чекауте — searchSettlements.","auth":"public","section":"step1"},{"model":"Address","method":"getWarehouses","title":"Отделения и почтоматы","hint":"Список точек города. Фильтр по типу, весу и габаритам делайте у себя, API отдаёт ограничения точки.","auth":"public","section":"step1"},{"model":"Address","method":"getWarehouseTypes","title":"Типы отделений","hint":"Ref типов, чтобы отличить отделение, почтомат, грузовое и пункт приёма.","auth":"public","section":"step1"},{"model":"Address","method":"getStreet","title":"Улицы города","hint":"Пакетная выгрузка улиц. На чекауте удобнее searchSettlementStreets.","auth":"public","section":"step1"},{"model":"Address","method":"save","title":"Создать адрес контрагента","hint":"Адрес забора или доставки, привязанный к контрагенту. Нужен ключ.","auth":"key","section":"step1"},{"model":"Address","method":"update","title":"Обновить адрес","hint":"Правка дома, квартиры, примечания. Ref адреса не меняется.","auth":"key","section":"step1"},{"model":"Address","method":"delete","title":"Удалить адрес","hint":"Не удаляйте адрес, на который ещё ссылаются открытые накладные.","auth":"key","section":"step1"},{"model":"Common","method":"getCargoTypes","title":"Типы груза","hint":"Parcel, Cargo, Documents, TiresWheels, Pallet. Кладётся в CargoType.","auth":"public","section":"step4"},{"model":"Common","method":"getServiceTypes","title":"Технологии доставки","hint":"WarehouseWarehouse, WarehouseDoors, DoorsWarehouse, DoorsDoors.","auth":"public","section":"step2"},{"model":"Common","method":"getTypesOfPayers","title":"Кто платит за доставку","hint":"Sender, Recipient, ThirdPerson → поле PayerType.","auth":"public","section":"step3"},{"model":"Common","method":"getTypesOfPayersForRedelivery","title":"Кто платит за обратную доставку","hint":"Отдельный плательщик для BackwardDeliveryData, не путать с PayerType самой доставки.","auth":"public","section":"step3"},{"model":"Common","method":"getPaymentForms","title":"Форма оплаты доставки","hint":"Cash — нал / при получении. NonCash — безнал по договору. Поле PaymentMethod.","auth":"public","section":"step3"},{"model":"Common","method":"getBackwardDeliveryCargoTypes","title":"Что везти обратно","hint":"Деньги, документы, тара и прочее. Для наложки нужен CargoType Money.","auth":"public","section":"step3"},{"model":"Common","method":"getPackList","title":"Упаковка","hint":"Коробки и пакеты Новой Почты. Ref уходит в OptionsSeat.packRef и PackingNumber.","auth":"public","section":"step4"},{"model":"Common","method":"getPalletsList","title":"Виды палет","hint":"Только если CargoType = Pallet.","auth":"public","section":"step4"},{"model":"Common","method":"getTiresWheelsList","title":"Шины и диски","hint":"Справочник размеров. Не подставляйте описание товара вместо Ref.","auth":"public","section":"step4"},{"model":"Common","method":"getCargoDescriptionList","title":"Описание груза","hint":"Готовые формулировки. Для магазина чаще свой шаблон Description.","auth":"public","section":"step4"},{"model":"Common","method":"getTimeIntervals","title":"Интервалы доставки","hint":"Для адресной доставки. Зависит от города получателя. Поле TimeInterval.","auth":"public","section":"step4"},{"model":"Common","method":"getOwnershipFormsList","title":"Формы собственности","hint":"Для юрлица получателя: OwnershipForm рядом с EDRPOU.","auth":"public","section":"step1"},{"model":"Common","method":"getTypesOfCounterparties","title":"Типы контрагентов","hint":"Organization или PrivatePerson. PrivatePerson — обычный покупатель.","auth":"public","section":"step1"},{"model":"Common","method":"getMessageCodeText","title":"Тексты ошибок","hint":"Расшифровка кодов из массива errors. Показывайте покупателю человеческий текст, в лог — код.","auth":"public","section":"step1"},{"model":"Counterparty","method":"getCounterparties","title":"Список контрагентов","hint":"CounterpartyProperty=Sender — ваши юрлица. Recipient — ранее созданные получатели.","auth":"key","section":"step1"},{"model":"Counterparty","method":"save","title":"Создать контрагента","hint":"Если NewAddress выключен, получателя надо сохранить до ЭН.","auth":"key","section":"step1"},{"model":"Counterparty","method":"update","title":"Обновить контрагента","hint":"Имя, телефон, ЕГРПОУ. Ref остаётся.","auth":"key","section":"step1"},{"model":"Counterparty","method":"delete","title":"Удалить контрагента","hint":"Только если на нём нет живых накладных.","auth":"key","section":"step1"},{"model":"Counterparty","method":"getCounterpartyContactPersons","title":"Контактные лица","hint":"ContactSender / ContactRecipient. У организации их может быть несколько.","auth":"key","section":"step1"},{"model":"Counterparty","method":"getCounterpartyAddresses","title":"Адреса контрагента","hint":"Склады и адреса забора. SenderAddress — Ref отсюда, не текстовая улица.","auth":"key","section":"step1"},{"model":"Counterparty","method":"getCounterpartyOptions","title":"Опции контрагента","hint":"Что договору разрешено: контроль оплаты, безнал, третье лицо.","auth":"key","section":"step1"},{"model":"ContactPerson","method":"save","title":"Создать контакт","hint":"ФИО и телефон человека, который сдаёт или получает.","auth":"key","section":"step1"},{"model":"ContactPerson","method":"update","title":"Обновить контакт","hint":"Телефон в API — 380XXXXXXXXX, без плюса и пробелов.","auth":"key","section":"step1"},{"model":"ContactPerson","method":"delete","title":"Удалить контакт","hint":"Не удаляйте контакт, выбранный как ContactSender по умолчанию.","auth":"key","section":"step1"},{"model":"InternetDocument","method":"save","title":"Создать экспресс-накладную","hint":"Главный метод модуля. Все значения по умолчанию из разделов «Накладная», «Оплата», «Услуги».","auth":"key","section":"step4"},{"model":"InternetDocument","method":"update","title":"Изменить накладную","hint":"Пока отправление не принято. Ref документа обязателен.","auth":"key","section":"step4"},{"model":"InternetDocument","method":"delete","title":"Удалить накладную","hint":"DocumentRefs — массив. Уже принятые накладные API не удалит.","auth":"key","section":"step4"},{"model":"InternetDocument","method":"getDocumentList","title":"Список накладных","hint":"DateTimeFrom / DateTimeTo или одна DateTime. Page и GetFullList для пагинации.","auth":"key","section":"step4"},{"model":"InternetDocument","method":"getDocumentPrice","title":"Рассчитать тариф","hint":"Город, вес, места, тип груза, услуга, оценочная стоимость. Ответ: Cost, CostRedelivery, CostPack.","auth":"key","section":"step2"},{"model":"InternetDocument","method":"getDocumentDeliveryDate","title":"Дата доставки","hint":"Прогноз по городам и ServiceType. Показывайте на чекауте как ориентир, не как гарантию.","auth":"key","section":"step2"},{"model":"InternetDocument","method":"generateReport","title":"Отчёт по накладным","hint":"Выгрузка, например CSV, за период. Не путать с печатью марки.","auth":"key","section":"step5"},{"model":"InternetDocument","method":"getEWTemplateList","title":"Шаблоны накладных","hint":"Шаблоны из кабинета. Можно подставить вместо ручных дефолтов.","auth":"key","section":"step4"},{"model":"InternetDocumentGeneral","method":"save","title":"ЭН по индексу отделения","hint":"Та же накладная, но SenderWarehouseIndex / RecipientWarehouseIndex вида 101/102 вместо UUID.","auth":"key","section":"step4"},{"model":"TrackingDocument","method":"getStatusDocuments","title":"Трекинг","hint":"Пачка номеров ЭН. В ответе Status, StatusCode, WarehouseRecipient, ScheduledDeliveryDate.","auth":"public","section":"step5"},{"model":"ScanSheet","method":"insertDocuments","title":"Добавить в реестр","hint":"Пустой Ref — создать новый реестр. DocumentRefs — накладные этого дня.","auth":"key","section":"step5"},{"model":"ScanSheet","method":"getScanSheetList","title":"Список реестров","hint":"Реестры, которые ещё не закрыты или за выбранные даты.","auth":"key","section":"step5"},{"model":"ScanSheet","method":"getScanSheet","title":"Один реестр","hint":"Состав и номер для печати сопроводительного.","auth":"key","section":"step5"},{"model":"ScanSheet","method":"getScanSheetDocuments","title":"ЭН внутри реестра","hint":"Короткий список номеров. Удобно сверять перед сдачей курьеру.","auth":"key","section":"step5"},{"model":"ScanSheet","method":"removeDocuments","title":"Убрать ЭН из реестра","hint":"Если накладную отменили после сборки реестра.","auth":"key","section":"step5"},{"model":"ScanSheet","method":"deleteScanSheet","title":"Расформировать реестр","hint":"Реестр удаляется, сами накладные остаются.","auth":"key","section":"step5"},{"model":"ScanSheet","method":"updateScanSheet","title":"Обновить реестр","hint":"Дата и состав. Ориентация печати задаётся при формировании.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"CheckPossibilityCreateReturn","title":"Можно ли оформить возврат","hint":"Проверка до save. Не каждая накладная возвращается одним запросом.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"getReturnReasons","title":"Причины возврата","hint":"Справочник причин. Подпричина — getReturnReasonsSubtypes.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"getReturnReasonsSubtypes","title":"Уточнение причины","hint":"Зависит от выбранной причины.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"getReturnOrdersList","title":"Заявки на возврат","hint":"Уже созданные возвраты по вашим ЭН.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"CheckPossibilityChangeEW","title":"Можно ли изменить ЭН","hint":"Смена данных получателя после создания, если статус ещё позволяет.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"getChangeEWOrdersList","title":"Заявки на изменение","hint":"История правок экспресс-накладных.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"save","title":"Создать заявку","hint":"Возврат, переадресация или изменение — один метод, разный набор полей.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"delete","title":"Отменить заявку","hint":"Пока её не взяли в работу.","auth":"key","section":"step5"},{"model":"AdditionalService","method":"getRedirectionOrdersList","title":"Заявки на переадресацию","hint":"Список переадресаций. Проверка возможности — в AdditionalServiceGeneral.","auth":"key","section":"step5"},{"model":"AdditionalServiceGeneral","method":"checkPossibilityForRedirecting","title":"Можно ли переадресовать","hint":"Перед save переадресации. Новое отделение должно принимать этот тип груза.","auth":"key","section":"step5"},{"model":"AdditionalServiceGeneral","method":"save","title":"Создать переадресацию","hint":"Новый адрес или отделение получателя.","auth":"key","section":"step5"},{"model":"AdditionalServiceGeneral","method":"delete","title":"Отменить переадресацию","hint":"Если покупатель всё же заберёт в исходной точке.","auth":"key","section":"step5"},{"model":"Print","method":"printDocument","title":"Печать накладной","hint":"Это ссылка кабинета, не calledMethod. HTML или PDF, одна или пачка Ref.","auth":"key","section":"step5"},{"model":"Print","method":"printMarkings","title":"Маркировка 100×100","hint":"Наклейка на коробку. Отдельно от бланка А4.","auth":"key","section":"step5"}],"service":[{"id":"WarehouseWarehouse","title":"В отделение / почтомат","hint":"Покупатель выбирает отделение или почтомат. Самый частый сценарий магазина."},{"id":"WarehouseDoors","title":"Курьером на адрес","hint":"Курьер Новой Почты везёт на адрес. Нужны улица, дом и квартира получателя."},{"id":"DoorsWarehouse","title":"Забор курьером → отделение","hint":"Курьер забирает у вас, покупатель забирает в отделении. SenderAddress — адрес, не склад."},{"id":"DoorsDoors","title":"Курьер → курьер","hint":"Забор и доставка курьером. Дороже и дольше: тариф считает getDocumentPrice."}],"kinds":[{"id":"branch","title":"Почтовые отделения","hint":"Обычные отделения (до 30 кг). Тип приходит из Address.getWarehouseTypes."},{"id":"postomat","title":"Почтоматы 24/7","hint":"Лимит веса и габаритов у каждого аппарата свой (обычно 40×60×30 см и до 20 кг)."},{"id":"cargo","title":"Грузовые отделения","hint":"Для палет, шин и мест тяжелее 30 кг (до 1000 кг)."},{"id":"store","title":"Пункты приёма-выдачи","hint":"Партнёрские точки в магазинах и ТРЦ. Включайте отдельно: у части точек нет выдачи."}],"cargo":[{"id":"Parcel","title":"Посылка","hint":"Типичный товар интернет-магазина (до 30 кг)."},{"id":"Cargo","title":"Груз","hint":"Сборный или тяжелый груз (от 30 до 1000 кг)."},{"id":"Documents","title":"Документы","hint":"Конверт. Вес обычно 0,1–0,5 кг, мест — 1."},{"id":"TiresWheels","title":"Шины и диски","hint":"Нужен справочник Common.getTiresWheelsList, не свободный текст."},{"id":"Pallet","title":"Палета","hint":"Вид палеты — Common.getPalletsList."},{"id":"Trays","title":"Поддоны (обратно)","hint":"Чаще как обратная доставка тары, не как основной груз магазина."}]}</script>
 </div>
-<script type="application/json" id="np-help-data">{{ help_panes_json|raw }}</script>
-<style>
-.np-admin { --ink:#1c1917; --muted:#6f675e; --line:#e6e0d6; --paper:#f6f3ee; --red:#c81e1e; }
-.np-admin .np-shell { display:flex; gap:18px; align-items:flex-start; }
-.np-admin .np-nav { width:210px; flex:0 0 210px; background:#fff; border:1px solid var(--line); border-radius:16px; padding:8px; position:sticky; top:12px; }
-.np-admin .np-nav button { display:block; width:100%; text-align:left; border:0; background:transparent; border-radius:10px; padding:10px 12px; color:var(--ink); font-weight:600; }
-.np-admin .np-nav button.is-on { background:#1c1917; color:#fff; }
-.np-admin .np-main { flex:1; min-width:0; background:#fff; border:1px solid var(--line); border-radius:16px; padding:22px; }
-.np-admin .np-pane { display:none; position:relative; padding:8px 44px 0 0; }
-.np-admin .np-pane.is-on { display:block; }
-.np-admin .np-help { position:absolute; top:0; right:0; width:32px; height:32px; border-radius:999px; border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:700; }
-.np-help-modal { position:fixed; inset:0; background:rgba(28,25,23,.45); z-index:10000; display:flex; align-items:center; justify-content:center; padding:24px; }
-.np-help-modal[hidden] { display:none; }
-.np-help-card { position:relative; background:#fff; color:var(--ink); width:100%; max-width:640px; max-height:80vh; overflow:auto; border-radius:16px; padding:22px 22px 18px; }
-.np-help-card h3 { margin:0 36px 12px 0; }
-.np-help-card #np-help-text { white-space:pre-line; line-height:1.5; }
-.np-help-x { position:absolute; top:12px; right:12px; width:32px; height:32px; border:0; border-radius:999px; background:#f6f3ee; font-size:20px; }
-.np-admin .np-field { position:relative; }
-.np-admin .np-suggest { position:absolute; z-index:30; left:0; right:0; top:100%; background:#fff; border:1px solid var(--line); border-radius:10px; max-height:220px; overflow:auto; box-shadow:0 8px 24px rgba(0,0,0,.08); }
-.np-admin .np-suggest button { display:block; width:100%; text-align:left; border:0; background:#fff; padding:8px 10px; border-bottom:1px solid #f3f0ea; }
-.np-admin label { display:block; margin:0 0 14px; color:var(--muted); font-size:13px; font-weight:600; }
-.np-admin input, .np-admin select { display:block; width:100%; margin-top:6px; height:40px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); padding:0 12px; box-shadow:none; }
-.np-admin textarea.np-grow { display:block; width:100%; min-height:88px; margin-top:6px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); padding:10px 12px; resize:vertical; line-height:1.45; field-sizing:content; }
-.np-admin small.np-tokens { white-space:pre-line; line-height:1.55; }
-.np-admin select[multiple] { height:auto; padding:8px; }
-.np-admin small, .np-admin .np-note { display:block; color:var(--muted); font-weight:400; margin-top:6px; }
-.np-admin .np-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
-.np-admin .np-inline { display:flex; gap:8px; flex-wrap:wrap; }
-.np-admin .np-inline input { flex:1; }
-.np-admin .np-inline button, .np-admin .np-ghost, .np-admin #button-sync { border:0; border-radius:10px; background:#1c1917; color:#fff; height:40px; padding:0 14px; font-weight:700; }
-.np-admin .np-ghost { background:#fff; color:var(--ink); border:1px solid var(--line); margin-top:12px; }
-.np-admin #button-sync { width:100%; margin:8px 0 4px; }
-.np-admin .np-card { border:1px solid var(--line); border-radius:14px; padding:16px 16px 6px; margin-bottom:14px; background:var(--paper); }
-.np-admin .np-card h3, .np-admin h3 { margin:0 0 12px; font-size:16px; color:var(--ink); }
-.np-admin .np-cn { width:100%; border-collapse:collapse; }
-.np-admin .np-cn td { padding:8px 0; border-top:1px solid var(--line); font-size:13px; color:var(--ink); }
-.np-admin .np-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-.np-admin .np-stats div { background:var(--paper); border-radius:14px; padding:14px; }
-.np-admin .np-stats b { display:block; font-size:26px; color:var(--ink); line-height:1; }
-.np-admin .np-stats span { color:var(--muted); font-size:12px; }
-.np-admin .np-table-wrap { overflow:auto; border:1px solid var(--line); border-radius:12px; }
-.np-admin #tariff-table { width:100%; border-collapse:collapse; min-width:860px; }
-.np-admin #tariff-table th { font-size:12px; color:var(--muted); font-weight:600; padding:8px; background:var(--paper); }
-.np-admin #tariff-table td { padding:6px; }
-.np-admin #tariff-table input { height:34px; }
-.np-admin .np-icon { border:0; background:transparent; color:var(--red); height:34px; }
-.np-admin .np-map { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center; margin-bottom:8px; }
-.np-admin .np-map em { color:var(--muted); font-style:normal; }
-.np-admin .np-code code { display:block; background:var(--paper); border-radius:10px; padding:8px 10px; margin-top:8px; word-break:break-all; }
-.np-admin .np-look { display:grid; grid-template-columns:1.2fr .8fr; gap:18px; align-items:start; }
-.np-admin .np-presets { display:flex; gap:8px; margin:-6px 0 14px; }
-.np-admin .np-presets button { border:1px solid var(--line); background:#fff; border-radius:999px; padding:6px 10px; font-weight:600; }
-.np-admin input[type="range"] { padding:0; height:28px; }
-.np-admin .np-check { display:flex; align-items:center; gap:8px; }
-.np-admin .np-check input { width:auto; height:auto; margin:0; }
-.np-admin .np-preview { background:var(--paper); border-radius:16px; padding:16px; }
-.np-admin .np-preview.is-compact button { padding:4px 8px; font-size:12px; }
-.np-admin .np-preview-types { display:flex; gap:6px; flex-wrap:wrap; }
-.np-admin .np-preview-types button { border:1px solid #e4e0d8; background:#fff; padding:8px 12px; font-weight:700; }
-.np-admin .np-preview-types button.is-on { color:#fff; }
-.np-admin .np-preview-input { margin-top:8px; background:#fff; border:1px solid #e4e0d8; padding:10px 12px; color:#6f675e; }
-.np-admin #sync-log { max-height:240px; overflow:auto; background:#1c1917; color:#f6f3ee; border-radius:12px; padding:12px; margin-top:12px; white-space:pre-wrap; }
-.np-admin .np-actions .btn-primary { background:#1c1917; border-color:#1c1917; }
-.np-ver { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px; background:#1c1917; color:#fff; font-size:12px; font-weight:700; vertical-align:middle; }
-.np-admin .np-versions { list-style:none; margin:0; padding:0; }
-.np-admin .np-versions li { display:flex; gap:14px; align-items:flex-start; padding:12px 0; border-top:1px solid var(--line); color:var(--ink); }
-.np-admin .np-versions b { flex:0 0 64px; color:var(--muted); }
-.np-admin .np-versions .is-current b { color:#fff; background:#1c1917; border-radius:999px; text-align:center; line-height:22px; }
-@media (max-width: 900px) {
-  .np-admin .np-shell, .np-admin .np-grid, .np-admin .np-map, .np-admin .np-stats, .np-admin .np-look { display:block; }
-  .np-admin .np-nav { width:auto; position:static; margin-bottom:12px; }
-  .np-admin .np-stats div { margin-bottom:8px; }
-}
-</style>
-<script>
-(function () {
-  var token = '{{ user_token }}';
-  var log = document.getElementById('sync-log');
-
-  document.querySelectorAll('.np-nav button').forEach(function (button) {
-    button.addEventListener('click', function () {
-      document.querySelectorAll('.np-nav button, .np-pane').forEach(function (node) {
-        node.classList.remove('is-on');
-      });
-      button.classList.add('is-on');
-      document.getElementById('np-' + button.getAttribute('data-pane')).classList.add('is-on');
-    });
-  });
-
-  function write(line) {
-    log.textContent += line + "\n";
-    log.scrollTop = log.scrollHeight;
-  }
-
-  $('#button-save-key, #button-api-check').on('click', function () {
-    var check = this.id === 'button-api-check';
-    $('#api-check-result').text('...');
-    var key = $('#input-api-key').val();
-    $.post('index.php?route=extension/shipping/novaposhta/saveKey&user_token=' + token, { key: key }, function (saved) {
-      if (!saved || saved.error) {
-        $('#api-check-result').text(saved && saved.error ? saved.error : 'error');
-        return;
-      }
-      if (!check) {
-        $('#api-check-result').text(saved.success || 'OK');
-        return;
-      }
-      $.post('index.php?route=extension/shipping/novaposhta/apiCheck&user_token=' + token, { key: key }, function (json) {
-        if (json.error) {
-          $('#api-check-result').text(json.error);
-          return;
-        }
-        var select = $('#input-sender').empty();
-        $.each(json.senders || [], function (_, row) {
-          select.append($('<option>').val(row.ref).text(row.name).attr('data-real', '1'));
-        });
-        $('#api-check-result').text((saved.success || 'OK') + ' / ' + (json.senders || []).length);
-        select.trigger('change');
-      }, 'json');
-    }, 'json');
-  });
-
-  function chosenName($select) {
-    var $option = $select.find(':selected');
-    if ($option.attr('data-real') !== '1') return '';
-    var text = $.trim($option.text());
-    if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text)) return '';
-    return text;
-  }
-  function rememberNames() {
-    var sender = chosenName($('#input-sender'));
-    var contact = chosenName($('#input-contact'));
-    if (sender) $('#input-sender-name').val(sender);
-    if (contact) $('#input-contact-name').val(contact);
-  }
-  function suggest($input, rows, onPick) {
-    $input.siblings('.np-suggest').remove();
-    if (!rows || !rows.length) return;
-    $input.parent().css('position', 'relative');
-    var $list = $('<div class="np-suggest"></div>');
-    $.each(rows, function (_, row) {
-      var label = row.area ? (row.name + ', ' + row.area) : row.name;
-      var $item = $('<button type="button"></button>').text(label);
-      $item.on('mousedown', function (e) {
-        e.preventDefault();
-        onPick(row);
-        $list.remove();
-      });
-      $list.append($item);
-    });
-    $input.after($list);
-  }
-  var cityTimer;
-  var whTimer;
-  $('#np-sender-city-q').on('input', function () {
-    var q = $.trim(this.value);
-    clearTimeout(cityTimer);
-    if (q.length < 2) return;
-    cityTimer = setTimeout(function () {
-      $.getJSON('index.php?route=extension/shipping/novaposhta/cities&user_token=' + token + '&q=' + encodeURIComponent(q), function (rows) {
-        suggest($('#np-sender-city-q'), rows || [], function (row) {
-          $('#np-sender-city-q').val(row.name).data('ref', row.ref);
-          $('#input-sender-city').val(row.ref);
-          $('#np-sender-wh-q').val('').focus();
-          $('#input-address-ref').val('');
-          $('#input-address-name').val('');
-        });
-      });
-    }, 200);
-  });
-  $('#np-sender-wh-q').on('input', function () {
-    var q = $.trim(this.value);
-    var city = $('#np-sender-city-q').data('ref') || $('#input-sender-city').val();
-    clearTimeout(whTimer);
-    if (!city || q.length < 1) return;
-    whTimer = setTimeout(function () {
-      $.getJSON('index.php?route=extension/shipping/novaposhta/warehouses&user_token=' + token + '&city_ref=' + encodeURIComponent(city) + '&q=' + encodeURIComponent(q), function (rows) {
-        suggest($('#np-sender-wh-q'), rows || [], function (row) {
-          var cityName = $.trim($('#np-sender-city-q').val());
-          var label = cityName ? (cityName + ', ' + row.name) : row.name;
-          $('#np-sender-wh-q').val(label);
-          $('#input-address-ref').val(row.ref);
-          $('#input-address-name').val(label);
-          $('#input-sender-city').val(city);
-        });
-      });
-    }, 200);
-  });
-  $('#input-sender').on('change', function () {
-    var ref = $(this).val();
-    if (!ref) return;
-    $.getJSON('index.php?route=extension/shipping/novaposhta/senderData&user_token=' + token + '&ref=' + encodeURIComponent(ref), function (json) {
-      if (json.error) return;
-      var contacts = $('#input-contact').empty();
-      $.each(json.contacts || [], function (_, row) {
-        contacts.append($('<option>').val(row.ref).text(row.name).attr('data-phone', row.phone || '').attr('data-real', '1'));
-      });
-      var addresses = $('#input-address-api').empty().prop('hidden', true);
-      $.each(json.addresses || [], function (_, row) {
-        addresses.append($('<option>').val(row.ref).text(row.name).attr('data-city', row.city_ref || '').attr('data-real', '1'));
-      });
-      if (addresses.children().length) {
-        addresses.prop('hidden', false);
-        var first = addresses.find('option').first();
-        $('#input-address-ref').val(first.val());
-        $('#input-address-name').val(first.text());
-        $('#np-sender-wh-q').val(first.text());
-        if (first.attr('data-city')) $('#input-sender-city').val(first.attr('data-city'));
-      }
-      contacts.trigger('change');
-      addresses.trigger('change');
-      rememberNames();
-    });
-  });
-
-  $('#input-contact').on('change', function () {
-    rememberNames();
-  });
-
-  $('#input-contact').on('change', function () {
-    var phone = $(this).find(':selected').attr('data-phone');
-    if (phone) $('#input-phone').val(phone);
-  });
-
-  $('#input-address-api').on('change', function () {
-    var $option = $(this).find(':selected');
-    if ($option.attr('data-real') !== '1') return;
-    $('#input-address-ref').val($option.val());
-    $('#input-address-name').val($option.text());
-    $('#np-sender-wh-q').val($option.text());
-    if ($option.attr('data-city')) $('#input-sender-city').val($option.attr('data-city'));
-  });
-
-  $('#button-sync').on('click', function () {
-    var button = $(this);
-    button.prop('disabled', true);
-    log.textContent = '';
-    function paint(counts) {
-      if (!counts) return;
-      $('#np-stat-regions').text(counts.regions);
-      $('#np-stat-cities').text(counts.cities);
-      $('#np-stat-branches').text(counts.warehouses);
-      $('#np-stat-lockers').text(counts.lockers);
-    }
-    function step(state) {
-      $.ajax({
-        url: 'index.php?route=extension/shipping/novaposhta/sync&user_token=' + token + '&job=' + encodeURIComponent(state.job) + '&page=' + state.page + '&type=' + encodeURIComponent(state.type || ''),
-        type: 'POST',
-        dataType: 'json',
-        data: { key: $('#input-api-key').val() },
-        success: function (json) {
-          if (json.error) {
-            write('ERROR: ' + json.error);
-            button.prop('disabled', false);
-            return;
-          }
-          write((json.label || state.job) + '  +' + (json.received || 0));
-          paint(json.counts);
-          if (json.next) {
-            step(json.next);
-            return;
-          }
-          write('done');
-          button.text(button.data('label-update') || button.text());
-          button.prop('disabled', false);
-        },
-        error: function (xhr) {
-          var text = (xhr.responseText || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 280);
-          write(text || 'request failed');
-          button.prop('disabled', false);
-        }
-      });
-    }
-    step({ job: 'areas', page: 1, type: '' });
-  });
-
-  var tariffRow = {{ shipping_novaposhta_tariff|length }};
-  $('#button-tariff-add').on('click', function () {
-    var i = tariffRow++;
-    var cells = ['weight', 'warehouse', 'city', 'region', 'ukraine', 'doors', 'doors_pickup', 'locker'].map(function (name) {
-      return '<td><input name="shipping_novaposhta_tariff[' + i + '][' + name + ']" value="" /></td>';
-    }).join('');
-    $('#tariff-table tbody').append('<tr>' + cells + '<td><button type="button" class="np-icon" onclick="$(this).closest(\'tr\').remove();"><i class="fa fa-times"></i></button></td></tr>');
-  });
-
-  $('.np-probe').on('click', function () {
-    var index = $(this).data('index');
-    var card = $(this).closest('.np-card');
-    var key = card.find('[name="shipping_novaposhta_senders[' + index + '][api_key]"]').val() || $('#input-api-key').val();
-    $.post('index.php?route=extension/shipping/novaposhta/apiCheck&user_token=' + token, { key: key, probe: 1 }, function (json) {
-      if (!json || json.error) {
-        window.alert(json && json.error ? json.error : 'error');
-        return;
-      }
-      var select = $('<select class="np-sender-pick"></select>');
-      $.each(json.senders || [], function (_, row) {
-        select.append($('<option>').val(row.ref).text(row.name));
-      });
-      card.find('.np-sender-pick').remove();
-      card.append(select);
-      select.on('change', function () {
-        card.find('[name="shipping_novaposhta_senders[' + index + '][ref]"]').val(this.value);
-        $.getJSON('index.php?route=extension/shipping/novaposhta/senderData&user_token=' + token + '&ref=' + encodeURIComponent(this.value) + '&key=' + encodeURIComponent(key), function (data) {
-          if (data.contacts && data.contacts[0]) {
-            card.find('[name="shipping_novaposhta_senders[' + index + '][contact]"]').val(data.contacts[0].ref);
-            card.find('[name="shipping_novaposhta_senders[' + index + '][contact_name]"]').val(data.contacts[0].name);
-            card.find('[name="shipping_novaposhta_senders[' + index + '][phone]"]').val(data.contacts[0].phone);
-          }
-          if (data.addresses && data.addresses[0]) {
-            card.find('[name="shipping_novaposhta_senders[' + index + '][address]"]').val(data.addresses[0].ref);
-            card.find('[name="shipping_novaposhta_senders[' + index + '][city]"]').val(data.addresses[0].city_ref);
-          }
-        });
-      });
-      select.trigger('change');
-    }, 'json');
-  });
-
-  var help = {};
-  try { help = JSON.parse($('#np-help-data').text() || '{}'); } catch (e) { help = {}; }
-  $('.np-help').on('click', function () {
-    var pane = help[$(this).data('help')] || {};
-    $('#np-help-title').text(pane.title || '');
-    $('#np-help-text').text(pane.text || '');
-    $('#np-help').removeAttr('hidden');
-  });
-  $('.np-help-x, #np-help').on('click', function (e) {
-    if (e.target === this) $('#np-help').attr('hidden', 'hidden');
-  });
-})();
-</script>
+<script>window.NP_BOOT = {{ boot|raw }};</script>
+<script src="view/javascript/novaposhta/settings.app.js?v=1"></script>
 {{ footer }}

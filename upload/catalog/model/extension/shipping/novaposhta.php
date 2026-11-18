@@ -1,165 +1,135 @@
 <?php
-require_once DIR_SYSTEM . 'library/novaposhta/service.php';
-
 class ModelExtensionShippingNovaposhta extends Model {
 	public function getQuote($address) {
-		$this->load->language('extension/shipping/novaposhta');
-
 		if (!$this->config->get('shipping_novaposhta_status')) {
 			return array();
 		}
 
-		$methods = $this->config->get('shipping_novaposhta_method');
-		if (!is_array($methods)) {
+		$this->load->library('novaposhta');
+		$state = $this->novaposhta->stateFromConfig();
+		if (empty($state['connection']['enabled']) || empty($state['methods']) || !is_array($state['methods'])) {
 			return array();
 		}
 
-		$countryId = (int)$this->config->get('shipping_novaposhta_country_id');
-		if ($countryId && (int)$address['country_id'] !== $countryId) {
-			return array();
-		}
+		$this->load->language('extension/shipping/novaposhta');
+		$weight = $this->weightKg();
+		$subtotal = (float)$this->cart->getSubTotal();
+		$quote_data = array();
 
-		$service = new NovaposhtaService($this->registry);
-		$cookie = isset($this->request->cookie['np_pick']) ? $this->request->cookie['np_pick'] : '';
-		$customerId = $this->customer->isLogged() ? (int)$this->customer->getId() : 0;
-		$service->hydrateSelection($this->session->data, $customerId, $cookie);
-		$metrics = $service->cartMetrics($this->cart);
-		$subtotal = $service->toUah($this->cart->getSubTotal());
-
-		$session = isset($this->session->data['novaposhta']) && is_array($this->session->data['novaposhta'])
-			? $this->session->data['novaposhta'] : array();
-
-		$cityName = !empty($address['city']) ? trim($address['city']) : '';
-		$cityRef = '';
-		if (!empty($session['city_ref']) && !empty($session['city_name']) && $this->sameText($session['city_name'], $cityName)) {
-			$cityRef = $session['city_ref'];
-		} elseif ($cityName) {
-			$cityRef = $service->findCityRef($cityName);
-		}
-
-		$divisionRef = '';
-		if (!empty($session['division_ref']) && $cityRef && !empty($session['city_ref']) && $session['city_ref'] === $cityRef) {
-			$divisionRef = $session['division_ref'];
-		} elseif ($cityRef && !empty($address['address_1'])) {
-			$divisionRef = $service->findWarehouseRef($cityRef, $address['address_1']);
-		}
-
-		$senderCity = (string)$this->config->get('shipping_novaposhta_sender_city');
-		$senderArea = $senderCity ? $service->cityAreaRef($senderCity) : '';
-		$recipientArea = $cityRef ? $service->cityAreaRef($cityRef) : '';
-
-		if ($cityRef && $cityRef === $senderCity) {
-			$zone = 'city';
-		} elseif ($recipientArea && $senderArea && $recipientArea === $senderArea) {
-			$zone = 'region';
-		} else {
-			$zone = 'ukraine';
-		}
-
-		$cod = 0;
-		$codPayments = $this->config->get('shipping_novaposhta_cod');
-		if (!is_array($codPayments)) {
-			$codPayments = array();
-		}
-		if (!empty($this->session->data['payment_method']['code']) && in_array($this->session->data['payment_method']['code'], $codPayments)) {
-			$cod = round($subtotal);
-		}
-
-		$senderType = $this->config->get('shipping_novaposhta_sender_type') === 'Doors' ? 'Doors' : 'Warehouse';
-		$quoteData = array();
-		$sharedArrival = '';
-
-		foreach (array('department', 'poshtomat', 'doors') as $code) {
-			if (empty($methods[$code]['status'])) {
+		foreach ($state['methods'] as $id => $cfg) {
+			if (empty($cfg['enabled'])) {
 				continue;
 			}
-
-			$method = $methods[$code];
-			$geoZoneId = isset($method['geo_zone_id']) ? (int)$method['geo_zone_id'] : 0;
-
-			if ($geoZoneId) {
-				$query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "zone_to_geo_zone`
-					WHERE geo_zone_id = '" . $geoZoneId . "'
-					AND country_id = '" . (int)$address['country_id'] . "'
-					AND (zone_id = '" . (int)$address['zone_id'] . "' OR zone_id = '0')");
-				if (!$query->num_rows) {
-					continue;
-				}
+			$max = isset($cfg['maxWeight']) ? (float)$cfg['maxWeight'] : 1000;
+			if ($weight > $max) {
+				continue;
 			}
-
-			$freeFrom = isset($method['free_from']) ? (float)$method['free_from'] : 0;
-			$serviceType = ($code === 'doors') ? $senderType . 'Doors' : $senderType . 'Warehouse';
-
-			$costUah = 0;
-			$period = 0;
-			$free = $freeFrom > 0 && $subtotal >= $freeFrom;
-
-			if (!$free) {
-				$apiOn = !empty($method['api']) && $cityRef && $this->config->get('shipping_novaposhta_api_key') && $senderCity;
-				if ($apiOn) {
-					$apiQuote = $service->quoteApi($cityRef, $code === 'doors' ? '' : $divisionRef, $serviceType, $metrics, $subtotal, $cod);
-					if ($apiQuote) {
-						$costUah = $apiQuote['cost'];
-						$period = $apiQuote['period'];
-					}
-				}
-
-				if ($costUah <= 0) {
-					$tariffWeight = max($metrics['weight'], $metrics['volume_weight']);
-					$costUah = $service->tariffCost($tariffWeight, $zone, $serviceType, $code);
-				}
-
-				if ($costUah <= 0) {
-					continue;
-				}
+			$cost = $this->priceFor($state, $id, $cfg, $weight, $subtotal, isset($address['city']) ? $address['city'] : '');
+			$free_from = isset($cfg['freeFrom']) ? (float)$cfg['freeFrom'] : 0;
+			$shop_pays = (isset($state['waybill']['payer']) && $state['waybill']['payer'] === 'Sender') || ($free_from > 0 && $subtotal >= $free_from);
+			if ($shop_pays) {
+				$cost = 0;
 			}
-
-			$cost = $service->fromUah($costUah);
-			$taxClassId = isset($method['tax_class_id']) ? (int)$method['tax_class_id'] : 0;
-			$title = $this->language->get('text_method_' . $code);
-
-			$text = $free
-				? $this->language->get('text_free')
-				: $this->currency->format($this->tax->calculate($cost, $taxClassId, $this->config->get('config_tax')), $this->session->data['currency']);
-
-			if ($period > 0) {
-				$arrival = date('d.m', strtotime('+' . (int)$period . ' day'));
-			} elseif ($sharedArrival !== '') {
-				$arrival = $sharedArrival;
-			} elseif ($cityRef && $senderCity && $this->config->get('shipping_novaposhta_api_key')) {
-				$sharedArrival = $service->deliveryDate($senderCity, $cityRef, $senderType . 'Warehouse');
-				$arrival = $sharedArrival;
-			} else {
-				$arrival = '';
-			}
-
-			if ($arrival) {
-				$text .= ' · ' . sprintf($this->language->get('text_arrival'), $arrival);
-			}
-
-			$quoteData[$code] = array(
-				'code'         => 'novaposhta.' . $code,
-				'title'        => $title,
-				'cost'         => $cost,
-				'tax_class_id' => $taxClassId,
-				'text'         => $text
+			$title = !empty($cfg['title']) ? $cfg['title'] : $id;
+			$quote_data[$id] = array(
+				'code' => 'novaposhta.' . $id,
+				'title' => $title,
+				'cost' => $cost,
+				'tax_class_id' => 0,
+				'text' => $cost <= 0 ? $this->language->get('text_free') : $this->currency->format($cost, $this->session->data['currency'])
 			);
 		}
 
-		if (!$quoteData) {
+		if (!$quote_data) {
 			return array();
 		}
 
 		return array(
-			'code'       => 'novaposhta',
-			'title'      => $this->language->get('text_title'),
-			'quote'      => $quoteData,
+			'code' => 'novaposhta',
+			'title' => $this->language->get('text_title'),
+			'quote' => $quote_data,
 			'sort_order' => (int)$this->config->get('shipping_novaposhta_sort_order'),
-			'error'      => false
+			'error' => false
 		);
 	}
 
-	private function sameText($a, $b) {
-		return utf8_strtolower(trim($a)) === utf8_strtolower(trim($b));
+	private function weightKg() {
+		$weight = (float)$this->cart->getWeight();
+		$query = $this->db->query("SELECT weight_class_id FROM " . DB_PREFIX . "weight_class_description WHERE unit IN ('kg','кг','KG','Kg') LIMIT 1");
+		if ($query->num_rows) {
+			$weight = (float)$this->weight->convert($weight, $this->config->get('config_weight_class_id'), (int)$query->row['weight_class_id']);
+		}
+		if ($weight <= 0) {
+			$this->load->library('novaposhta');
+			$state = $this->novaposhta->stateFromConfig();
+			$weight = isset($state['waybill']['weight']) ? (float)$state['waybill']['weight'] : 1;
+		}
+		return $weight;
+	}
+
+	private function priceFor($state, $id, $cfg, $weight, $subtotal, $city) {
+		if (isset($cfg['priceMode']) && $cfg['priceMode'] === 'fixed') {
+			return max(0, (float)$cfg['fixedPrice']);
+		}
+		$api_key = isset($state['connection']['apiKey']) ? trim((string)$state['connection']['apiKey']) : '';
+		if (strlen($api_key) >= 32 && $city) {
+			$sender_city = isset($state['sender']['city']) ? $state['sender']['city'] : 'Київ';
+			$cache_key = 'np.price.' . md5($sender_city . '|' . $city . '|' . $weight . '|' . $subtotal . '|' . $id);
+			$cached = $this->cache->get($cache_key);
+			if ($cached !== null && $cached !== false && $cached !== '') {
+				return (float)$cached;
+			}
+			$sender_ref = $this->cityRef($sender_city);
+			$recip_ref = $this->cityRef($city);
+			if ($sender_ref && $recip_ref) {
+				$this->load->library('novaposhta');
+				$res = $this->novaposhta->call('InternetDocument', 'getDocumentPrice', array(
+					'CitySender' => $sender_ref,
+					'CityRecipient' => $recip_ref,
+					'Weight' => (string)$weight,
+					'ServiceType' => $id,
+					'Cost' => (string)max(1, round($subtotal)),
+					'CargoType' => isset($state['waybill']['cargoType']) ? $state['waybill']['cargoType'] : 'Parcel',
+					'SeatsAmount' => isset($state['waybill']['seats']) ? (string)$state['waybill']['seats'] : '1'
+				), $api_key, isset($state['connection']['timeoutSec']) ? (int)$state['connection']['timeoutSec'] : 20);
+				if (!empty($res['success']) && isset($res['data'][0]['Cost'])) {
+					$cost = (float)$res['data'][0]['Cost'];
+					$this->cache->set($cache_key, $cost);
+					return $cost;
+				}
+			}
+		}
+		$doors = (strpos($id, 'Doors') !== false);
+		if ($weight <= 2) {
+			return $doors ? 105 : 70;
+		}
+		if ($weight <= 10) {
+			return $doors ? 145 : 95;
+		}
+		return $doors ? 145 : 135;
+	}
+
+	private function cityRef($label) {
+		$name = trim(preg_replace('/^м\.\s*/u', '', (string)$label));
+		$name = trim(preg_replace('/\(.*\)/u', '', $name));
+		if ($name === '') {
+			return '';
+		}
+		$cache_key = 'np.city.' . md5(mb_strtolower($name));
+		$cached = $this->cache->get($cache_key);
+		if ($cached) {
+			return $cached;
+		}
+		$this->load->library('novaposhta');
+		$res = $this->novaposhta->call('Address', 'searchSettlements', array(
+			'CityName' => $name,
+			'Limit' => '1'
+		), '', 15);
+		$ref = '';
+		if (!empty($res['data'][0]['Addresses'][0]['DeliveryCity'])) {
+			$ref = $res['data'][0]['Addresses'][0]['DeliveryCity'];
+			$this->cache->set($cache_key, $ref);
+		}
+		return $ref;
 	}
 }

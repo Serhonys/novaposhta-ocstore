@@ -1,0 +1,160 @@
+/* module chrome from the reference screens */
+#np-app, #np-app * { box-sizing: border-box; }
+#np-app { color: var(--ink, #111); }
+
+  :root {
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --ink: #111111;
+    --muted: #5c6370;
+    --line: #e4e5e9;
+    --ok: #157a3a;
+    --ok-soft: #e8f6ee;
+    --bad: #c42323;
+    --bad-soft: #fdecec;
+    --warn: #855a00;
+    --warn-soft: #fff6df;
+    --wash: #f6f6f7;
+  }
+  * { box-sizing: border-box; }
+  html, body, #np-app { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f3f4f6; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+  /* Скругленные pill-свитч переключатели */
+  .pill-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 42px;
+    height: 24px;
+    border-radius: 9999px;
+    background-color: #d1d5db;
+    transition: background-color 0.18s ease;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .pill-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+  .pill-knob {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .pill-switch input:checked ~ .pill-knob {
+    transform: translateX(18px);
+  }
+  .pill-switch.tone-black:has(input:checked) { background-color: #111111; }
+  .pill-switch.tone-green:has(input:checked) { background-color: #157a3a; }
+  .pill-switch.tone-red:has(input:checked) { background-color: #c42323; }
+
+  /* Ползунки симулятора */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: #e4e5e9;
+    border-radius: 9999px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #111111;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 0 1.5px #111111;
+    cursor: pointer;
+  }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .accordion-chevron { transform: rotate(180deg); }
+
+
+  :root {
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --ink: #111111;
+    --muted: #5c6370;
+    --line: #e4e5e9;
+    --ok: #157a3a;
+    --ok-soft: #e8f6ee;
+    --bad: #c42323;
+    --bad-soft: #fdecec;
+    --warn: #855a00;
+    --warn-soft: #fff6df;
+    --wash: #f6f6f7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f3f4f6; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+  /* Скругленные pill-переключатели */
+  .pill-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 42px;
+    height: 24px;
+    border-radius: 9999px;
+    background-color: #d1d5db;
+    transition: background-color 0.18s ease;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .pill-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+  .pill-knob {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .pill-switch input:checked ~ .pill-knob {
+    transform: translateX(18px);
+  }
+  .pill-switch.tone-black:has(input:checked) { background-color: #111111; }
+  .pill-switch.tone-green:has(input:checked) { background-color: #157a3a; }
+  .pill-switch.tone-red:has(input:checked) { background-color: #c42323; }
+
+  @keyframes spinFast {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .spin-sync { animation: spinFast 0.7s linear infinite; }
+
+  /* Плавная анимация ширины левого сайдбара */
+  #left-sidebar {
+    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.22s ease;
+  }
+
+#np-app { max-width: 100%; overflow-x: clip; }
+#np-app > header { min-width: 0; }
+#np-app > header > .flex-1 { min-width: 0; }
+#np-app .overflow-x-auto { max-width: 100%; }
